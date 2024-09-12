@@ -1,7 +1,19 @@
 ---
 title: "Project Part 1"
-# author: "Thimoté DUPUCH"
-# date: "9/09/2024"
+subtitle: "Group 9"
+
+date: "16/09/2024"
+authors:
+  - name: Thimoté Dupuch
+    affiliation: University of Twente
+    email: t.dupuch@student.utwente.nl
+  - name: Joris van Lierop
+    affiliation: University of Twente
+    email: j.j.w.vanlierop@student.utwente.nl
+  - name: Jurre van Sijpveld
+    affiliation: University of Twente
+    email: j.vansijpveld@student.utwente.nl
+
 format:
     html:
         embed-resources: true
@@ -16,6 +28,8 @@ format:
 library(dplyr)
 library(forcats)
 library(vtable)
+library(ggplot2)
+library(plotly) # Optional
 ```
 
 
@@ -64,11 +78,33 @@ dataset <- mutate(dataset,
   STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
 
 )
-
 ```
 
-### Descriptive table of variables
+### Description of the dataset and table of variables
+The dataset is about cardiovascular health. It contains two outcomes : EVENT and TEVENT, the presence of cardiovascular events and the number of days the patient is in study until the event occurs. The dataset contains many variables, some of them are categorical and some of them are numerical. It covers patient descriptives, classical risk factors, previous symptomatic atherosclerosis, and markers of atherosclerosis.
+
 
 ```{r}
 sumtable(dataset, out = "return", add.median = TRUE)
+```
+
+
+
+## Association between variables and the outcome
+
+```{r}
+avg_event_proportion <- mean(as.numeric(dataset$EVENT == "yes"))
+SMOKING <- dataset$SMOKING
+EVENT <- dataset$EVENT
+
+bar_plot <- ggplot(dataset, aes(x = SMOKING, fill = EVENT)) +
+    geom_bar(position = "fill") + # "fill" scales the bars to proportion
+    geom_hline(yintercept = avg_event_proportion, linetype = "dashed") +
+    labs(
+        title = "Cardiovascular Event by Smoking Status",
+        x = "Smoking Status", y = "Proportion (-- : Average)",
+        fill = "Cardiovascular Event"
+    )
+
+ggplotly(bar_plot,width = 500, height = 600)
 ```
