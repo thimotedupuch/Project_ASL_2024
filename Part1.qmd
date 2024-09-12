@@ -1,7 +1,7 @@
 ---
-title: "Essai render QMD"
-author: "Thimoté DUPUCH"
-date: "9/09/2024"
+title: "Project Part 1"
+# author: "Thimoté DUPUCH"
+# date: "9/09/2024"
 format:
     html:
         embed-resources: true
@@ -10,9 +10,65 @@ format:
 
 
 
+### Loading libraries
 ```{r}
-#| echo: false
-dataset <- read.csv("SMARTc.csv", sep = ";") # Dataset without missing values
+#| output: false
+library(dplyr)
+library(forcats)
+library(vtable)
+```
 
 
+### Loading dataset
+```{r}	
+dataset <- read.csv("SMARTc.csv", sep = ";") # Without missing values
+```
+
+
+### Re-encode the categorical variables
+
+```{r}	
+
+dataset <- mutate(dataset,
+  EVENT = factor(EVENT),
+  EVENT = fct_recode(EVENT, "no" = "0", "yes" = "1"),
+
+  SEX = factor(SEX),
+  SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
+
+  DIABETES = factor(DIABETES),
+  DIABETES = fct_recode(DIABETES, "no" = "0", "yes" = "1"),
+
+  SMOKING = factor(SMOKING),
+  SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
+
+  alcohol = factor(alcohol),
+  alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
+
+  CEREBRAL = factor(CEREBRAL),
+  CEREBRAL = fct_recode(CEREBRAL, "no" = "0", "yes" = "1"),
+
+  CARDIAC = factor(CARDIAC),
+  CARDIAC = fct_recode(CARDIAC, "no" = "0", "yes" = "1"),
+
+  AAA = factor(AAA),
+  AAA = fct_recode(AAA, "no" = "0", "yes" = "1"),
+
+  PERIPH = factor(PERIPH),
+  PERIPH = fct_recode(PERIPH, "no" = "0", "yes" = "1"),
+
+  albumin = factor(albumin),
+  albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
+
+  STENOSIS = factor(STENOSIS),
+  STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
+
+)
+
+```
+
+### Descriptive table of variables
+
+```{r}
+sumtable(dataset, out = "return", add.median = TRUE)
 ```

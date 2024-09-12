@@ -6,10 +6,8 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Thimoté DUPUCH">
-<meta name="dcterms.date" content="2024-09-09">
 
-<title>Essai render QMD</title>
+<title>Project Part 1</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -20,6 +18,40 @@ ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
 width: 0.8em;
 margin: 0 0.8em 0.2em -1em;  vertical-align: middle;
+}
+
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+}
+pre.numberSource { margin-left: 3em; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -4323,26 +4355,14 @@ window.onload = function() {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Essai render QMD</h1>
+<h1 class="title">Project Part 1</h1>
 </div>
 
 
 
 <div class="quarto-title-meta">
 
-    <div>
-    <div class="quarto-title-meta-heading">Author</div>
-    <div class="quarto-title-meta-contents">
-             <p>Thimoté DUPUCH </p>
-          </div>
-  </div>
     
-    <div>
-    <div class="quarto-title-meta-heading">Published</div>
-    <div class="quarto-title-meta-contents">
-      <p class="date">September 9, 2024</p>
-    </div>
-  </div>
   
     
   </div>
@@ -4352,20 +4372,72 @@ window.onload = function() {
 </header>
 
 
-<section id="header-1" class="level1">
-<h1>Header 1</h1>
-<section id="header-2" class="level3">
-<h3 class="anchored" data-anchor-id="header-2">Header 2</h3>
+<section id="loading-libraries" class="level3">
+<h3 class="anchored" data-anchor-id="loading-libraries">Loading libraries</h3>
 <div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(forcats)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(vtable)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="loading-dataset" class="level3">
+<h3 class="anchored" data-anchor-id="loading-dataset">Loading dataset</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;SMARTc.csv&quot;</span>, <span class="at">sep =</span> <span class="st">&quot;;&quot;</span>) <span class="co"># Without missing values</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="re-encode-the-categorical-variables" class="level3">
+<h3 class="anchored" data-anchor-id="re-encode-the-categorical-variables">Re-encode the categorical variables</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dataset <span class="ot">&lt;-</span> <span class="fu">mutate</span>(dataset,</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">EVENT =</span> <span class="fu">factor</span>(EVENT),</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">EVENT =</span> <span class="fu">fct_recode</span>(EVENT, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">SEX =</span> <span class="fu">factor</span>(SEX),</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">SEX =</span> <span class="fu">fct_recode</span>(SEX, <span class="st">&quot;male&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>, <span class="st">&quot;female&quot;</span> <span class="ot">=</span> <span class="st">&quot;2&quot;</span>),</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">DIABETES =</span> <span class="fu">factor</span>(DIABETES),</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">DIABETES =</span> <span class="fu">fct_recode</span>(DIABETES, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">SMOKING =</span> <span class="fu">factor</span>(SMOKING),</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">SMOKING =</span> <span class="fu">fct_recode</span>(SMOKING, <span class="st">&quot;never&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>, <span class="st">&quot;former&quot;</span> <span class="ot">=</span> <span class="st">&quot;2&quot;</span>, <span class="st">&quot;current&quot;</span> <span class="ot">=</span> <span class="st">&quot;3&quot;</span>),</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">alcohol =</span> <span class="fu">factor</span>(alcohol),</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">alcohol =</span> <span class="fu">fct_recode</span>(alcohol, <span class="st">&quot;never&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>, <span class="st">&quot;former&quot;</span> <span class="ot">=</span> <span class="st">&quot;2&quot;</span>, <span class="st">&quot;current&quot;</span> <span class="ot">=</span> <span class="st">&quot;3&quot;</span>),</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">CEREBRAL =</span> <span class="fu">factor</span>(CEREBRAL),</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">CEREBRAL =</span> <span class="fu">fct_recode</span>(CEREBRAL, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">CARDIAC =</span> <span class="fu">factor</span>(CARDIAC),</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">CARDIAC =</span> <span class="fu">fct_recode</span>(CARDIAC, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">AAA =</span> <span class="fu">factor</span>(AAA),</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">AAA =</span> <span class="fu">fct_recode</span>(AAA, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>  <span class="at">PERIPH =</span> <span class="fu">factor</span>(PERIPH),</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>  <span class="at">PERIPH =</span> <span class="fu">fct_recode</span>(PERIPH, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>  <span class="at">albumin =</span> <span class="fu">factor</span>(albumin),</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>  <span class="at">albumin =</span> <span class="fu">fct_recode</span>(albumin, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>, <span class="st">&quot;micro&quot;</span> <span class="ot">=</span> <span class="st">&quot;2&quot;</span>, <span class="st">&quot;macro&quot;</span> <span class="ot">=</span> <span class="st">&quot;3&quot;</span>),</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">STENOSIS =</span> <span class="fu">factor</span>(STENOSIS),</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>  <span class="at">STENOSIS =</span> <span class="fu">fct_recode</span>(STENOSIS, <span class="st">&quot;no&quot;</span> <span class="ot">=</span> <span class="st">&quot;0&quot;</span>, <span class="st">&quot;yes&quot;</span> <span class="ot">=</span> <span class="st">&quot;1&quot;</span>),</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="descriptive-table-of-variables" class="level3">
+<h3 class="anchored" data-anchor-id="descriptive-table-of-variables">Descriptive table of variables</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sumtable</span>(dataset, <span class="at">out =</span> <span class="st">&quot;return&quot;</span>, <span class="at">add.median =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div data-pagedtable="false">
   <script data-pagedtable-source type="application/json">
-{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["type"],"name":[1],"type":["chr"],"align":["left"]},{"label":["summary"],"name":[2],"type":["I<named list>"],"align":["right"]}],"data":[{"1":"numeric","2":"<I<named list>>","_rn_":"TEVENT"},{"1":"categorical","2":"<I<named list>>","_rn_":"EVENT"},{"1":"categorical","2":"<I<named list>>","_rn_":"SEX"},{"1":"numeric","2":"<I<named list>>","_rn_":"AGE"},{"1":"categorical","2":"<I<named list>>","_rn_":"DIABETES"},{"1":"categorical","2":"<I<named list>>","_rn_":"CEREBRAL"},{"1":"categorical","2":"<I<named list>>","_rn_":"CARDIAC"},{"1":"categorical","2":"<I<named list>>","_rn_":"AAA"},{"1":"categorical","2":"<I<named list>>","_rn_":"PERIPH"},{"1":"categorical","2":"<I<named list>>","_rn_":"STENOSIS"},{"1":"numeric","2":"<I<named list>>","_rn_":"SYSTBP"},{"1":"numeric","2":"<I<named list>>","_rn_":"DIASTBP"},{"1":"numeric","2":"<I<named list>>","_rn_":"SYSTH"},{"1":"numeric","2":"<I<named list>>","_rn_":"DIASTH"},{"1":"numeric","2":"<I<named list>>","_rn_":"LENGTH"},{"1":"numeric","2":"<I<named list>>","_rn_":"WEIGHT"},{"1":"numeric","2":"<I<named list>>","_rn_":"BMI"},{"1":"numeric","2":"<I<named list>>","_rn_":"CHOL"},{"1":"numeric","2":"<I<named list>>","_rn_":"HDL"},{"1":"numeric","2":"<I<named list>>","_rn_":"LDL"},{"1":"numeric","2":"<I<named list>>","_rn_":"TRIG"},{"1":"numeric","2":"<I<named list>>","_rn_":"HOMOC"},{"1":"numeric","2":"<I<named list>>","_rn_":"GLUT"},{"1":"numeric","2":"<I<named list>>","_rn_":"CREAT"},{"1":"numeric","2":"<I<named list>>","_rn_":"IMT"},{"1":"categorical","2":"<I<named list>>","_rn_":"albumin"},{"1":"categorical","2":"<I<named list>>","_rn_":"SMOKING"},{"1":"numeric","2":"<I<named list>>","_rn_":"packyrs"},{"1":"categorical","2":"<I<named list>>","_rn_":"alcohol"},{"1":"categorical","2":"<I<named list>>","_rn_":"HISTCARD"},{"1":"categorical","2":"<I<named list>>","_rn_":"HISTCAR2"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":["Variable"],"name":[1],"type":["chr"],"align":["left"]},{"label":["N"],"name":[2],"type":["chr"],"align":["left"]},{"label":["Mean"],"name":[3],"type":["chr"],"align":["left"]},{"label":["Std. Dev."],"name":[4],"type":["chr"],"align":["left"]},{"label":["Min"],"name":[5],"type":["chr"],"align":["left"]},{"label":["Pctl. 25"],"name":[6],"type":["chr"],"align":["left"]},{"label":["Pctl. 50"],"name":[7],"type":["chr"],"align":["left"]},{"label":["Pctl. 75"],"name":[8],"type":["chr"],"align":["left"]},{"label":["Max"],"name":[9],"type":["chr"],"align":["left"]}],"data":[{"1":"TEVENT","2":"3873","3":"1370","4":"942","5":"0.1","6":"555","7":"1213","8":"2165","9":"3466"},{"1":"EVENT","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"3413","3":"88%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"460","3":"12%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"SEX","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... male","2":"2897","3":"75%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... female","2":"976","3":"25%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"AGE","2":"3873","3":"60","4":"11","5":"19","6":"52","7":"60","8":"68","9":"82"},{"1":"DIABETES","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"3018","3":"78%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"855","3":"22%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"CEREBRAL","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"2726","3":"70%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"1147","3":"30%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"CARDIAC","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"1713","3":"44%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"2160","3":"56%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"AAA","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"3457","3":"89%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"416","3":"11%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"PERIPH","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"2933","3":"76%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"940","3":"24%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"STENOSIS","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"3135","3":"81%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... yes","2":"738","3":"19%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"SYSTBP","2":"3873","3":"140","4":"20","5":"96","6":"126","7":"138","8":"153","9":"216"},{"1":"DIASTBP","2":"3873","3":"80","4":"9.9","5":"46","6":"73","7":"79","8":"86","9":"127"},{"1":"SYSTH","2":"3873","3":"143","4":"22","5":"79","6":"127","7":"140","8":"156","9":"244"},{"1":"DIASTH","2":"3873","3":"82","4":"12","5":"45","6":"74","7":"81","8":"89","9":"136"},{"1":"LENGTH","2":"3873","3":"1.7","4":"0.087","5":"1.5","6":"1.7","7":"1.8","8":"1.8","9":"1.9"},{"1":"WEIGHT","2":"3873","3":"81","4":"14","5":"50","6":"72","7":"80","8":"89","9":"124"},{"1":"BMI","2":"3873","3":"27","4":"3.8","5":"19","6":"24","7":"26","8":"29","9":"40"},{"1":"CHOL","2":"3873","3":"5.2","4":"1.1","5":"2.8","6":"4.4","7":"5.1","8":"5.9","9":"9.4"},{"1":"HDL","2":"3873","3":"1.2","4":"0.37","5":"0.58","6":"0.96","7":"1.2","8":"1.4","9":"2.5"},{"1":"LDL","2":"3873","3":"3.1","4":"1","5":"1.1","6":"2.4","7":"3","8":"3.8","9":"6.6"},{"1":"TRIG","2":"3873","3":"1.9","4":"1.2","5":"0.56","6":"1.1","7":"1.5","8":"2.2","9":"9"},{"1":"HOMOC","2":"3873","3":"14","4":"5.4","5":"6.1","6":"10","7":"13","8":"16","9":"38"},{"1":"GLUT","2":"3873","3":"6.3","4":"2","5":"4.3","6":"5.3","7":"5.7","8":"6.5","9":"19"},{"1":"CREAT","2":"3873","3":"98","4":"64","5":"54","6":"78","7":"89","8":"101","9":"825"},{"1":"IMT","2":"3873","3":"0.94","4":"0.27","5":"0.47","6":"0.75","7":"0.88","8":"1.1","9":"1.8"},{"1":"albumin","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... no","2":"3042","3":"79%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... micro","2":"695","3":"18%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... macro","2":"136","3":"4%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"SMOKING","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... never","2":"697","3":"18%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... former","2":"2731","3":"71%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... current","2":"445","3":"11%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"packyrs","2":"3873","3":"23","4":"20","5":"0","6":"5.9","7":"20","8":"34","9":"120"},{"1":"alcohol","2":"3873","3":"","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... never","2":"761","3":"20%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... former","2":"412","3":"11%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"... current","2":"2700","3":"70%","4":"","5":"","6":"","7":"","8":"","9":""},{"1":"HISTCARD","2":"3873","3":"1.2","4":"0.47","5":"1","6":"1","7":"1","8":"1","9":"4"},{"1":"HISTCAR2","2":"3873","3":"1.3","4":"0.65","5":"1","6":"1","7":"1","8":"1","9":"5"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
 </div>
 </div>
-</section>
 </section>
 
 </main>
