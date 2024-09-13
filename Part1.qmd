@@ -30,6 +30,9 @@ library(forcats)
 library(vtable)
 library(ggplot2)
 library(plotly) # Optional
+library(broom)
+library(lmtest)
+library(mice)
 ```
 
 
@@ -94,11 +97,8 @@ sumtable(dataset, out = "return", add.median = TRUE)
 
 ```{r}
 avg_event_proportion <- mean(as.numeric(dataset$EVENT == "yes"))
-SMOKING <- dataset$SMOKING
-EVENT <- dataset$EVENT
-
 bar_plot <- ggplot(dataset, aes(x = SMOKING, fill = EVENT)) +
-    geom_bar(position = "fill") + # "fill" scales the bars to proportion
+    geom_bar(position = "fill") +
     geom_hline(yintercept = avg_event_proportion, linetype = "dashed") +
     labs(
         title = "Cardiovascular Event by Smoking Status",
@@ -106,5 +106,61 @@ bar_plot <- ggplot(dataset, aes(x = SMOKING, fill = EVENT)) +
         fill = "Cardiovascular Event"
     )
 
-ggplotly(bar_plot,width = 500, height = 600)
+#ggplotly(bar_plot,width = 500, height = 600)
+bar_plot
+```
+
+This bar plot shows the proportion of cardiovascular events by smoking status. The dashed line represents the average proportion of cardiovascular events in the dataset. The proportion of cardiovascular events is higher for former smokers, even higher than the average.
+
+
+```{r}
+boxplot <- ggplot(dataset, aes(x = as.factor(EVENT), y = AGE)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(x = "EVENT", y = "AGE", title = "Boxplot of age by event")
+
+ggplotly(boxplot)
+```
+
+
+
+## Logistic regression model
+
+```{r}	
+fit <- glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    HISTCAR2 + HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
+    alcohol + albumin, data = dataset, family = "binomial")
+tidy(fit)
+```
+
+The logistic regression model shows that the variables associated with the lowest p-values are HISTCAR2, HDL and AGE. The other variables have higher p-values, which means they are less associated with the outcome.
+
+
+```{r}
+anova(fit)
+```
+
+
+
+```{r}
+conf_intervals <- confint(fit, trace = FALSE, test = c("LRT", "Rao"))
+conf_intervals_df <- as.data.frame(conf_intervals)
+conf_intervals_df
+```
+
+```{r}
+conf_intervals_df$Variable <- rownames(conf_intervals_df)
+colnames(conf_intervals_df) <- c("Lower", "Upper", "Variable")
+conf_intervals_df <- conf_intervals_df[conf_intervals_df$Variable != "(Intercept)", ]
+
+conf_intervals_plot <- ggplot(conf_intervals_df, aes(x = Variable, ymin = Lower, ymax = Upper)) +
+    geom_errorbar(width = 0.2) +
+    geom_point(aes(y = (Lower + Upper) / 2)) +
+    coord_flip() +
+    labs(
+        title = "Confidence Intervals for Logistic Regression Coefficients",
+        x = "Variable",
+        y = "Confidence Interval"
+    )
+
+conf_intervals_plot
 ```
