@@ -104,10 +104,10 @@ bar_plot <- ggplot(dataset, aes(x = SMOKING, fill = EVENT)) +
         title = "Cardiovascular Event by Smoking Status",
         x = "Smoking Status", y = "Proportion (-- : Average)",
         fill = "Cardiovascular Event"
-    )
+    ) +
+    coord_flip()
 
-#ggplotly(bar_plot,width = 500, height = 600)
-bar_plot
+ggplotly(bar_plot)
 ```
 
 This bar plot shows the proportion of cardiovascular events by smoking status. The dashed line represents the average proportion of cardiovascular events in the dataset. The proportion of cardiovascular events is higher for former smokers, even higher than the average.
@@ -160,7 +160,83 @@ conf_intervals_plot <- ggplot(conf_intervals_df, aes(x = Variable, ymin = Lower,
         title = "Confidence Intervals for Logistic Regression Coefficients",
         x = "Variable",
         y = "Confidence Interval"
-    )
+    ) + 
+    theme_minimal()
 
 conf_intervals_plot
 ```
+
+
+## Imputation of missing values
+
+```{r}
+dataset <- read.csv("SMART.csv", sep = ";") # With missing values
+```
+
+```{r}
+#| output: false
+dataset_imputed <- mice(dataset, m = 5, seed = 123)
+dataset_imputed <- complete(dataset_imputed)
+```
+
+
+```{r}
+fit_imputed <- with(dataset_imputed, glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    HISTCAR2 + HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
+    alcohol + albumin, data = dataset, family = "binomial"))
+tidy(fit_imputed)
+```
+
+
+Comparison between the logistic regression model with and without imputation of missing values :
+
+```{r}
+anova(fit_imputed)
+```
+
+```{r}
+conf_intervals_imputed <- confint(fit_imputed, trace = FALSE, test = c("LRT", "Rao"))
+conf_intervals_imputed_df <- as.data.frame(conf_intervals_imputed)
+conf_intervals_imputed_df
+```
+
+```{r}
+conf_intervals_imputed_df$Variable <- rownames(conf_intervals_imputed_df)
+colnames(conf_intervals_imputed_df) <- c("Lower", "Upper", "Variable")
+conf_intervals_imputed_df <- conf_intervals_imputed_df[conf_intervals_imputed_df$Variable != "(Intercept)", ]
+
+conf_intervals_imputed_plot <- ggplot(conf_intervals_imputed_df, aes(x = Variable, ymin = Lower, ymax = Upper)) +
+    geom_errorbar(width = 0.2) +
+    geom_point(aes(y = (Lower + Upper) / 2)) +
+    coord_flip() +
+    labs(
+        title = "Confidence Intervals for Logistic Regression Coefficients (Imputed)",
+        x = "Variable",
+        y = "Confidence Interval"
+    ) +
+    theme_minimal()
+
+conf_intervals_imputed_plot
+```
+
+## Plot of comparison between the two models
+
+```{r}
+conf_intervals_df$Model <- "Without Imputation"
+conf_intervals_imputed_df$Model <- "With Imputation"
+conf_intervals_combined <- rbind(conf_intervals_df, conf_intervals_imputed_df)
+
+conf_intervals_combined_plot <- ggplot(conf_intervals_combined, aes(x = Variable, ymin = Lower, ymax = Upper, color = Model)) +
+    geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.5,alpha = 0.5) +
+    geom_point(aes(y = (Lower + Upper) / 2), alpha = 0.5) +
+    coord_flip() +
+    labs(
+        title = "Confidence Intervals for Logistic Regression Coefficients",
+        x = "Variable",
+        y = "Confidence Interval"
+    ) + 
+    theme_minimal()
+
+conf_intervals_combined_plot
+```
+
