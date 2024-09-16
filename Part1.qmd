@@ -1,8 +1,7 @@
 ---
-title: "Project Part 1"
+title: "Project Part 1  16/09/2024"
 subtitle: "Group 9"
 
-date: "16/09/2024"
 authors:
   - name: Thimoté Dupuch
     affiliation: University of Twente
@@ -29,7 +28,7 @@ library(dplyr)
 library(forcats)
 library(vtable)
 library(ggplot2)
-library(plotly) # Optional
+library(plotly)
 library(broom)
 library(lmtest)
 library(mice)
@@ -141,117 +140,50 @@ anova(fit)
 ```
 
 
+For the 3 most significant variables, the odds ratios are :
 
 ```{r}
-conf_intervals <- confint(fit, trace = FALSE, test = c("LRT", "Rao"))
-conf_intervals_df <- as.data.frame(conf_intervals)
-conf_intervals_df
+exp(fit$coefficients[c("HISTCAR2", "HDL", "AGE")])
 ```
+
+- HISTCAR2 : an increase of 1 point in the HISTCAR2 score results in a 51% higher odds of a cardiovascular event.
+- HDL : an increase of 1 mmol/L decreases the odds of a cardiovascular event by almost 57%.
+- AGE : an increase of 1 year results in a 2% higher odds of a cardiovascular event. 
+
+In our regression model, the categorical variables are : SEX, DIABETES, STENOSIS, SMOKING, ALCOHOL, ALBUMIN
 
 ```{r}
-conf_intervals_df$Variable <- rownames(conf_intervals_df)
-colnames(conf_intervals_df) <- c("Lower", "Upper", "Variable")
-conf_intervals_df <- conf_intervals_df[conf_intervals_df$Variable != "(Intercept)", ]
-
-conf_intervals_plot <- ggplot(conf_intervals_df, aes(x = Variable, ymin = Lower, ymax = Upper)) +
-    geom_errorbar(width = 0.2) +
-    geom_point(aes(y = (Lower + Upper) / 2)) +
-    coord_flip() +
-    labs(
-        title = "Confidence Intervals for Logistic Regression Coefficients",
-        x = "Variable",
-        y = "Confidence Interval"
-    ) + 
-    theme_minimal()
-
-conf_intervals_plot
+lrtest(fit,"SEX")
 ```
+```{r}
+lrtest(fit,"DIABETES")
+```
+```{r}
+lrtest(fit,"STENOSIS")
+```
+```{r}
+lrtest(fit,"SMOKING")
+```
+```{r}
+lrtest(fit,"alcohol")
+```
+```{r}
+lrtest(fit,"albumin")
+```
+
+SMOKING and STENOSIS are the most significant variables among the categorical variables.
 
 
 ## Imputation of missing values
 
-```{r}
-dataset <- read.csv("SMART.csv", sep = ";") # With missing values
-```
-
-```{r}
-#| output: false
-dataset_imputed <- mice(dataset, m = 5, seed = 123)
-dataset_imputed <- complete(dataset_imputed)
-```
-
-
-```{r}
-fit_imputed <- with(dataset_imputed, glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
-    HISTCAR2 + HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
-    alcohol + albumin, data = dataset, family = "binomial"))
-tidy(fit_imputed)
-```
-
-
-Comparison between the logistic regression model with and without imputation of missing values :
-
-```{r}
-anova(fit_imputed)
-```
-
-```{r}
-conf_intervals_imputed <- confint(fit_imputed, trace = FALSE, test = c("LRT", "Rao"))
-conf_intervals_imputed_df <- as.data.frame(conf_intervals_imputed)
-conf_intervals_imputed_df
-```
-
-```{r}
-conf_intervals_imputed_df$Variable <- rownames(conf_intervals_imputed_df)
-colnames(conf_intervals_imputed_df) <- c("Lower", "Upper", "Variable")
-conf_intervals_imputed_df <- conf_intervals_imputed_df[conf_intervals_imputed_df$Variable != "(Intercept)", ]
-
-conf_intervals_imputed_plot <- ggplot(conf_intervals_imputed_df, aes(x = Variable, ymin = Lower, ymax = Upper)) +
-    geom_errorbar(width = 0.2) +
-    geom_point(aes(y = (Lower + Upper) / 2)) +
-    coord_flip() +
-    labs(
-        title = "Confidence Intervals for Logistic Regression Coefficients (Imputed)",
-        x = "Variable",
-        y = "Confidence Interval"
-    ) +
-    theme_minimal()
-
-conf_intervals_imputed_plot
-```
-
-## Plot of comparison between the two models
-
-```{r}
-conf_intervals_df$Model <- "Without Imputation"
-conf_intervals_imputed_df$Model <- "With Imputation"
-conf_intervals_combined <- rbind(conf_intervals_df, conf_intervals_imputed_df)
-
-conf_intervals_combined_plot <- ggplot(conf_intervals_combined, aes(x = Variable, ymin = Lower, ymax = Upper, color = Model)) +
-    geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.5,alpha = 0.5) +
-    geom_point(aes(y = (Lower + Upper) / 2), alpha = 0.5) +
-    coord_flip() +
-    labs(
-        title = "Confidence Intervals for Logistic Regression Coefficients",
-        x = "Variable",
-        y = "Confidence Interval"
-    ) + 
-    theme_minimal()
-
-conf_intervals_combined_plot
-```
-
-
----
-
-### Final part
-
 ```{r}	
+#| output: false
+
 # Load the dataset
-Patients_C <- read.csv("SMART.csv", sep = ";")
+Data <- read.csv("SMART.csv", sep = ";")
 
 # Categorical variable conversions
-Patients_C <- Patients_C %>%
+Data <- Data %>%
   mutate(
     SEX = factor(SEX) %>% fct_recode("male" = "1", "female" = "2"),
     DIABETES = factor(DIABETES) %>% fct_recode("No" = "0", "Yes" = "1"),
@@ -266,24 +198,31 @@ Patients_C <- Patients_C %>%
   )
 
 # Final pre-processing
-final_part_c <- Patients_C %>%
+Organized_data <- Data %>%
   mutate(log_CREAT = log(CREAT)) %>%
   select(-c(HISTCARD, CREAT))  # Exclude these columns
 
+# Impute missing values with 'mice' - generate 5 imputed datasets
+imputed_data <- mice(Organized_data, m = 5, maxit = 5, method = 'pmm', seed = 123)
+
+fit_imputed <- with(imputed_data, glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    HISTCAR2 + HOMOC + log_CREAT + STENOSIS + IMT + SMOKING +
+    alcohol + albumin, data = dataset, family = "binomial"))
 ```
+
 
 ```{r}
-# Impute missing values with 'mice' - generate 5 imputed datasets
-imputed_data <- mice(final_part_c, m = 5, maxit = 5, method = "pmm", seed = 123)
+summary(fit_imputed)
+```
 
-# Fit logistic regression model on imputed datasets
-log_reg_model <- with(imputed_data, glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES + HISTCAR2 + HOMOC + log_CREAT + STENOSIS + IMT + SMOKING + alcohol + albumin,
-    family = binomial
-))
-
+```{r}	
 # Pool the results from the 5 imputed datasets
-pooled_results <- pool(log_reg_model)
+results <- pool(fit_imputed)
 
 # View the pooled summary
-summary(pooled_results)
+summary(results)
 ```
+
+
+
+In conclusion, we can see that even with the imputed dataset, the logistic regression model shows that the variables associated with the lowest p-values are HISTCAR2, HDL and AGE. The other variables have higher p-values, which means they are less associated with the outcome. The model with imputed data shows that on average, p-values are a bit increased. Since new imputed data may reduce variability making the predictors more stable and less likely to produce large fluctuations. Since new imputed data should represent normal real data with 'expected' values, it should not produce outliers and therefore the dataset with imputed data shows more stable relationships logically. In contrast to this, the dataset without imputed data shows more variability and P-values are on average very low because it is real data without smoothening imputed variables likely to have more outliers for example. But, comparing the logistic regression model of both datasets, the same variables still have the highest significance (Age, HDL & HISTCAR2).
