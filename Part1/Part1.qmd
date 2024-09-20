@@ -1,0 +1,228 @@
+---
+title: "Project Part 1  16/09/2024"
+subtitle: "Group 9"
+
+authors:
+  - name: Thimoté Dupuch
+    affiliation: University of Twente
+    email: t.dupuch@student.utwente.nl
+  - name: Joris van Lierop
+    affiliation: University of Twente
+    email: j.j.w.vanlierop@student.utwente.nl
+  - name: Jurre van Sijpveld
+    affiliation: University of Twente
+    email: j.vansijpveld@student.utwente.nl
+
+format:
+    html:
+        embed-resources: true
+        df-print: paged
+---
+
+
+
+### Loading libraries
+```{r}
+#| output: false
+library(dplyr)
+library(forcats)
+library(vtable)
+library(ggplot2)
+library(plotly)
+library(broom)
+library(lmtest)
+library(mice)
+```
+
+
+### Loading dataset
+```{r}	
+dataset <- read.csv("SMARTc.csv", sep = ";") # Without missing values
+```
+
+
+### Re-encode the categorical variables
+
+```{r}	
+
+dataset <- mutate(dataset,
+  EVENT = factor(EVENT),
+  EVENT = fct_recode(EVENT, "no" = "0", "yes" = "1"),
+
+  SEX = factor(SEX),
+  SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
+
+  DIABETES = factor(DIABETES),
+  DIABETES = fct_recode(DIABETES, "no" = "0", "yes" = "1"),
+
+  SMOKING = factor(SMOKING),
+  SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
+
+  alcohol = factor(alcohol),
+  alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
+
+  CEREBRAL = factor(CEREBRAL),
+  CEREBRAL = fct_recode(CEREBRAL, "no" = "0", "yes" = "1"),
+
+  CARDIAC = factor(CARDIAC),
+  CARDIAC = fct_recode(CARDIAC, "no" = "0", "yes" = "1"),
+
+  AAA = factor(AAA),
+  AAA = fct_recode(AAA, "no" = "0", "yes" = "1"),
+
+  PERIPH = factor(PERIPH),
+  PERIPH = fct_recode(PERIPH, "no" = "0", "yes" = "1"),
+
+  albumin = factor(albumin),
+  albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
+
+  STENOSIS = factor(STENOSIS),
+  STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
+
+)
+```
+
+### Description of the dataset and table of variables
+The dataset is about cardiovascular health. It contains two outcomes : EVENT and TEVENT, the presence of cardiovascular events and the number of days the patient is in study until the event occurs. The dataset contains many variables, some of them are categorical and some of them are numerical. It covers patient descriptives, classical risk factors, previous symptomatic atherosclerosis, and markers of atherosclerosis.
+
+
+```{r}
+sumtable(dataset, out = "return", add.median = TRUE)
+```
+
+
+
+## Association between variables and the outcome
+
+```{r}
+avg_event_proportion <- mean(as.numeric(dataset$EVENT == "yes"))
+bar_plot <- ggplot(dataset, aes(x = SMOKING, fill = EVENT)) +
+    geom_bar(position = "fill") +
+    geom_hline(yintercept = avg_event_proportion, linetype = "dashed") +
+    labs(
+        title = "Cardiovascular Event by Smoking Status",
+        x = "Smoking Status", y = "Proportion (-- : Average)",
+        fill = "Cardiovascular Event"
+    ) +
+    coord_flip()
+
+ggplotly(bar_plot)
+```
+
+This bar plot shows the proportion of cardiovascular events by smoking status. The dashed line represents the average proportion of cardiovascular events in the dataset. The proportion of cardiovascular events is higher for former smokers, even higher than the average.
+
+
+```{r}
+boxplot <- ggplot(dataset, aes(x = as.factor(EVENT), y = AGE)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(x = "EVENT", y = "AGE", title = "Boxplot of age by event")
+
+ggplotly(boxplot)
+```
+
+
+
+## Logistic regression model
+
+```{r}	
+fit <- glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    HISTCAR2 + HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
+    alcohol + albumin, data = dataset, family = "binomial")
+tidy(fit)
+```
+
+The logistic regression model shows that the variables associated with the lowest p-values are HISTCAR2, HDL and AGE. The other variables have higher p-values, which means they are less associated with the outcome.
+
+
+
+```{r}
+anova(fit)
+```
+
+
+For the 3 most significant variables, the odds ratios are :
+
+```{r}
+exp(fit$coefficients[c("HISTCAR2", "HDL", "AGE")])
+```
+
+- HISTCAR2 : an increase of 1 point in the HISTCAR2 score results in a 51% higher odds of a cardiovascular event.
+- HDL : an increase of 1 mmol/L decreases the odds of a cardiovascular event by almost 57%.
+- AGE : an increase of 1 year results in a 2% higher odds of a cardiovascular event. 
+
+In our regression model, the categorical variables are : SEX, DIABETES, STENOSIS, SMOKING, ALCOHOL, ALBUMIN
+
+```{r}
+lrtest(fit,"SEX")
+```
+```{r}
+lrtest(fit,"DIABETES")
+```
+```{r}
+lrtest(fit,"STENOSIS")
+```
+```{r}
+lrtest(fit,"SMOKING")
+```
+```{r}
+lrtest(fit,"alcohol")
+```
+```{r}
+lrtest(fit,"albumin")
+```
+
+SMOKING and STENOSIS are the most significant variables among the categorical variables.
+
+
+## Imputation of missing values
+
+```{r}	
+#| output: false
+
+# Load the dataset
+Data <- read.csv("SMART.csv", sep = ";")
+
+# Categorical variable conversions
+Data <- Data %>%
+  mutate(
+    SEX = factor(SEX) %>% fct_recode("male" = "1", "female" = "2"),
+    DIABETES = factor(DIABETES) %>% fct_recode("No" = "0", "Yes" = "1"),
+    SMOKING = factor(SMOKING) %>% fct_recode("never" = "1", "former" = "2", "current" = "3"),
+    alcohol = factor(alcohol) %>% fct_recode("never" = "1", "former" = "2", "current" = "3"),
+    CEREBRAL = factor(CEREBRAL) %>% fct_recode("No" = "0", "Yes" = "1"),
+    CARDIAC = factor(CARDIAC) %>% fct_recode("No" = "0", "Yes" = "1"),
+    AAA = factor(AAA) %>% fct_recode("No" = "0", "Yes" = "1"),
+    PERIPH = factor(PERIPH) %>% fct_recode("No" = "0", "Yes" = "1"),
+    albumin = factor(albumin) %>% fct_recode("no" = "1", "micro" = "2", "macro" = "3"),
+    STENOSIS = factor(STENOSIS) %>% fct_recode("No" = "0", "Yes" = "1")
+  )
+
+# Final pre-processing
+Organized_data <- Data %>%
+  mutate(log_CREAT = log(CREAT)) %>%
+  select(-c(HISTCARD, CREAT))  # Exclude these columns
+
+# Impute missing values with 'mice' - generate 5 imputed datasets
+imputed_data <- mice(Organized_data, m = 5, maxit = 5, method = 'pmm', seed = 123)
+
+fit_imputed <- with(imputed_data, glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    HISTCAR2 + HOMOC + log_CREAT + STENOSIS + IMT + SMOKING +
+    alcohol + albumin, data = dataset, family = "binomial"))
+```
+
+
+```{r}
+summary(fit_imputed)
+```
+
+```{r}	
+# Pool the results from the 5 imputed datasets
+results <- pool(fit_imputed)
+
+# View the pooled summary
+summary(results)
+```
+
+
+
+In conclusion, we can see that even with the imputed dataset, the logistic regression model shows that the variables associated with the lowest p-values are HISTCAR2, HDL and AGE. The other variables have higher p-values, which means they are less significant. The model with imputed data shows that on average, p-values are a bit increased. This is because new imputed data may reduce variability, making the predictors more stable and less likely to produce large fluctuations. As new imputed data should represent normal real data with 'expected' values, it probably will not produce outliers and therefore we see that the dataset with imputed data shows more stable relationships logically. In contrast to this, the dataset without imputed data shows more variability and P-values are on average very low because it is real data without smoothening imputed variables likely to have more outliers for example. But, comparing the logistic regression model of both datasets, the same variables still have the highest significance (AGE, HDL & HISTCAR2).

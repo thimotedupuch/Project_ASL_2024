@@ -1,0 +1,21 @@
+---
+title: "Project Part 2  27/09/2024"
+subtitle: "Group 9"
+
+authors:
+  - name: Thimoté Dupuch
+    affiliation: University of Twente
+    email: t.dupuch@student.utwente.nl
+  - name: Joris van Lierop
+    affiliation: University of Twente
+    email: j.j.w.vanlierop@student.utwente.nl
+  - name: Jurre van Sijpveld
+    affiliation: University of Twente
+    email: j.vansijpveld@student.utwente.nl
+
+format:
+    html:
+        embed-resources: true
+        df-print: paged
+---
+
