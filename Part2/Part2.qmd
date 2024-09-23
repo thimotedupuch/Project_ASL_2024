@@ -25,9 +25,6 @@ format:
 toc: true
 toc-depth: 3
 toc-location: right
-
-
-
 ---
 
 ## Loading libraries
@@ -85,25 +82,53 @@ dataset <- mutate(dataset,
 ### Accessing performance using cross-validation
 
 ```{r}
+#| output: false
 k <- 5
-
-folds <- createFolds(dataset, k = k, list = TRUE, returnTrain = FALSE)
-
+folds <- createFolds(dataset$EVENT, k = k, list = TRUE, returnTrain = FALSE)
+roc_list <- list()
 
 for (i in 1:k) {
     train <- dataset[-folds[[i]], ]
     test <- dataset[folds[[i]], ]
+
     fit_train <- glm(EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
         HISTCAR2 + HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
         alcohol + albumin, data = train, family = "binomial")
-    predicted <- predict(fit_train, newdata = test, type = "response")
-    if (length(unique(test$EVENT)) == 2) {
-        # Compute ROC only if both classes are present
-        roc_result <- roc(test$EVENT, predicted)
-        print(roc_result)
-    } else {
-        print(paste("Fold", i, "has no cases or controls. Skipping ROC."))
-    }
+
+    predict_test <- predict(fit_train, newdata = test, type = "response")
+    roc_i <- roc(test$EVENT, predict_test)
+    roc_list[[i]] <- roc_i
 }
+```
+
+
+```{r}
+#| code-fold: true
+#| code-summary: display code to plot the ROC curves
+roc_df <- do.call(rbind, lapply(1:length(roc_list), function(i) {
+    data.frame(
+        Fold = paste("Fold", i),
+        Sensitivity = roc_list[[i]]$sensitivities,
+        Specificity = 1 - roc_list[[i]]$specificities
+    )
+}))
+
+roc_plot <- ggplot(roc_df, aes(x = Specificity, y = Sensitivity, color = Fold)) +
+    geom_line(linewidth = 0.8) +
+    scale_color_brewer(palette = "Set1") +
+    theme_minimal(base_size = 14) +
+    labs(
+        title = "ROC Curves for Each Fold",
+        x = "1 - Specificity",
+        y = "Sensitivity",
+        color = "Fold"
+    ) +
+    theme(
+        plot.title = element_text(hjust = 0.5, size = 15, face = "bold"),
+        legend.position = "bottom"
+    ) +
+    coord_equal()
+
+ggplotly(roc_plot)
 
 ```
