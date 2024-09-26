@@ -24,6 +24,7 @@ format:
 
 toc: true
 toc-depth: 3
+toc-expand: true
 toc-location: right
 ---
 
@@ -38,12 +39,16 @@ library(broom)
 library(boot)
 library(caret)
 library(pROC)
+library(knitr)
+library(MASS)
+library(data.table)
 ```
 
 
 ## Loading dataset
 ```{r}	
-dataset <- read.csv("SMARTc.csv", sep = ";") # Without missing values
+# dataset <- read.csv("SMARTc.csv", sep = ";") # Without missing values
+dataset <- fread("SMARTc.csv", sep = ";") # Much faster
 ```
 
 
@@ -83,9 +88,11 @@ dataset <- mutate(dataset,
 
 ```{r}
 #| output: false
-k <- 5
+k <- 10
+set.seed(123)
 folds <- createFolds(dataset$EVENT, k = k, list = TRUE, returnTrain = FALSE)
 roc_list <- list()
+auc_values <- numeric(k)
 
 for (i in 1:k) {
     train <- dataset[-folds[[i]], ]
@@ -98,6 +105,7 @@ for (i in 1:k) {
     predict_test <- predict(fit_train, newdata = test, type = "response")
     roc_i <- roc(test$EVENT, predict_test)
     roc_list[[i]] <- roc_i
+    auc_values[i] <- auc(roc_i)
 }
 ```
 
@@ -115,7 +123,7 @@ roc_df <- do.call(rbind, lapply(1:length(roc_list), function(i) {
 
 roc_plot <- ggplot(roc_df, aes(x = Specificity, y = Sensitivity, color = Fold)) +
     geom_line(linewidth = 0.8) +
-    scale_color_brewer(palette = "Set1") +
+    scale_color_brewer(palette = "Set3") +
     theme_minimal(base_size = 14) +
     labs(
         title = "ROC Curves for Each Fold",
@@ -132,3 +140,151 @@ roc_plot <- ggplot(roc_df, aes(x = Specificity, y = Sensitivity, color = Fold)) 
 ggplotly(roc_plot)
 
 ```
+
+
+```{r}
+auc_table <- data.frame(Iteration = 1:k, AUC = auc_values)
+mean_auc <- mean(auc_values)
+auc_table$AUC <- round(auc_table$AUC, 4)
+mean_auc <- round(mean_auc, 4)
+auc_table <- rbind(auc_table, c("AUC mean", mean_auc))
+kable(auc_table, caption = "AUC Values for 10-Fold Cross-Validation")
+```
+
+```{r}
+(auc_confidence_interval = t.test(auc_values)$conf.int)
+```
+
+This means that we can be 95% confident that the true AUC value lies between **0.7077** and **0.7704**.
+
+## Calibration model
+### Assessing the calibration using a calibration plot
+
+
+```{r}	
+# df_copy <- mutate(dataset,
+#     EVENT = fct_recode(EVENT, "0" = "no", "1" = "yes"),
+# )
+
+observed_outcomes <- as.numeric(test$EVENT) - 1
+calibration_data <- data.frame(Predicted = predict_test, Observed = observed_outcomes)
+```
+
+```{r}
+#| code-fold: true
+#| code-summary: display code to plot the calibration plot
+calibration_plot <- ggplot(calibration_data, aes(x = Predicted, y = Observed)) +
+    geom_smooth(method = "loess", se = FALSE, formula = y ~ x, color = "#3ca7c7") +
+    geom_point(size = 2, alpha = 0.5) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed",color = "#ff8800") +
+    labs(
+        x = "Predicted Probability",
+        y = "Observed Probability",
+        title = "Calibration Plot"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(plot.title = element_text(hjust = 0.5, size = 15, face = "bold"))
+
+ggplotly(calibration_plot)
+
+```
+
+---
+
+The orange dashed line is the ideal calibration line, where the predicted probabilities perfectly match the observed outcomes. The blue curve shows the actual calibration of the model — how the predictions from the model align with the observed data.
+
+For the low predicted probabilities (0.0 to 0.1), the blue curve is relatively flat and near the dashed line, indicating that the model is well-calibrated for low-probability predictions.
+For the moderate predicted probabilities (0.1 to 0.3), the blue curve deviates from the orange dashed line and rises faster than the ideal line. This suggests overprediction in this range : the model tends to predict higher probabilities than are observed in reality.
+For higher predicted probabilities (above 0.3), the blue curve is consistently above the orange line, indicating a general overestimation of risk. This means that when the model predicts a higher probability of an event, the actual frequency is lower than what is predicted. This overestimation can lead to false positives, where the model predicts events that don’t actually occur as often as expected.
+
+## Performance comparison between the logistic regression model and a LDA model
+
+```{r}
+#| output: false
+
+k <- 10
+folds <- createFolds(dataset$EVENT, k = k, list = TRUE, returnTrain = FALSE)
+auc_values_glm <- numeric(k)
+auc_values_lda <- numeric(k)
+brier_scores_glm <- numeric(k)
+brier_scores_lda <- numeric(k)
+
+fit_formula <- EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    HISTCAR2 + HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
+    alcohol + albumin
+
+
+for (i in 1:k) {
+    train <- dataset[-folds[[i]], ]
+    test <- dataset[folds[[i]], ]
+
+    fit_train <- glm(fit_formula, data = train, family = "binomial")
+    lda_train <- lda(fit_formula, data = train)
+
+    predict_test_glm <- predict(fit_train, newdata = test, type = "response")
+    predict_test_lda <- predict(lda_train, newdata = test)$posterior[, 2]
+
+    roc_glm <- roc(test$EVENT, predict_test_glm)
+    roc_lda <- roc(test$EVENT, predict_test_lda)
+
+    auc_glm <- auc(roc_glm)
+    auc_lda <- auc(roc_lda)
+
+    auc_values_glm[i] <- auc_glm
+    auc_values_lda[i] <- auc_lda
+    
+    test$EVENT_numeric <- ifelse(test$EVENT == "yes", 1, 0)
+
+    brier_scores_glm[i] <- mean((predict_test_glm - test$EVENT_numeric)^2)
+    brier_scores_lda[i] <- mean((predict_test_lda - test$EVENT_numeric)^2)
+}
+```
+
+```{r}
+auc_table <- data.frame(
+    Iteration = 1:k,
+    AUC_GLM = auc_values_glm,
+    AUC_LDA = auc_values_lda
+)
+mean_auc_glm <- mean(auc_values_glm)
+mean_auc_lda <- mean(auc_values_lda)
+auc_table <- rbind(auc_table, c("AUC mean", mean_auc_glm, mean_auc_lda))
+kable(auc_table, caption = "AUC Values for 10-Fold Cross-Validation")
+```
+
+```{r}	
+brier_scores_table <- data.frame(
+    Iteration = 1:k,
+    Brier_Score_GLM = brier_scores_glm,
+    Brier_Score_LDA = brier_scores_lda
+)
+
+mean_brier_score_glm <- mean(brier_scores_glm)
+mean_brier_score_lda <- mean(brier_scores_lda)
+brier_scores_table <- rbind(
+    brier_scores_table,
+    c("Brier Score mean", mean_brier_score_glm, mean_brier_score_lda)
+)
+
+kable(brier_scores_table, caption = "Brier Scores for 10-Fold Cross-Validation")
+```
+
+```{r}
+(auc_confidence_interval_glm <- t.test(auc_values_glm)$conf.int)
+(auc_confidence_interval_lda <- t.test(auc_values_lda)$conf.int)
+```
+
+This means that we can be 95% confident that the true AUC value for the logistic regression model lies between **0.7047** and **0.7743**, and for the LDA model between **0.7011** and **0.7745**.
+
+
+```{r}	
+(brier_score_confidence_interval_glm <- t.test(brier_scores_glm)$conf.int)
+(brier_score_confidence_interval_lda <- t.test(brier_scores_lda)$conf.int)
+```
+
+This means that we can be 95% confident that the true Brier score for the logistic regression model lies between **0.0920** and **0.0972**, and for the LDA model between **0.0928** and **0.0998**.
+
+
+### Conclusion
+
+The logistic regression model and the LDA model have similar performance in terms of AUC and Brier score. The logistic regression model has a slightly lower Brier score, indicating better calibration, but the difference is small. Both models have similar AUC values, indicating similar discrimination performance.
