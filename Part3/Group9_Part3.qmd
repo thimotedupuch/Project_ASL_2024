@@ -36,6 +36,13 @@ toc-location: right
 library(dplyr)
 library(data.table)
 library(forcats)
+library(glmnet)
+library(pROC)
+library(knitr)
+
+library(ggplot2)
+library(plotly)
+
 
 ```
 
@@ -75,4 +82,136 @@ dataset <- mutate(dataset,
     STENOSIS = factor(STENOSIS),
     STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
 )
+```
+
+## Lasso regression model
+
+```{r}
+set.seed(123)
+# p.278
+
+formula <- EVENT ~ AGE + SEX + BMI + SYSTH + HDL + DIABETES +
+    +HOMOC + log(CREAT) + STENOSIS + IMT + SMOKING +
+    alcohol + albumin
+
+
+# Splitting the data
+train_sample <- sample(1:nrow(dataset), nrow(dataset) * 0.7)
+train_data <- dataset[train_sample, ]
+test_data <- dataset[-train_sample, ]
+
+# with grid search for finetuning
+grid <- 10 ^ seq(10, -2, length = 100) 
+
+lasso.mod <- cv.glmnet(
+    x = model.matrix(formula, data = train_data)[, -1],
+    y = as.numeric(train_data$EVENT) - 1,
+    alpha = 1,
+    family = "binomial",
+    nfolds = 10,
+    lambda = grid
+)
+
+cv.out <- cv.glmnet(
+    x = model.matrix(formula, data = train_data)[, -1],
+    y = as.numeric(train_data$EVENT) - 1,
+    alpha = 1,
+    family = "binomial",
+    nfolds = 10,
+    lambda = grid
+)
+
+best_lambda <- cv.out$lambda.min
+lasso.pred <- predict(lasso.mod,
+    s = best_lambda,
+    newx = model.matrix(formula, data = test_data)[, -1], type = "response"
+)
+
+# Mean squared error
+mean((lasso.pred - (as.numeric(test_data$EVENT) - 1))^2)
+
+```
+
+
+```{r}
+plot(cv.out)
+```
+
+### Performance of the model
+
+
+```{r}	
+#| output: false
+roc_lasso <- roc(test_data$EVENT, lasso.pred)
+auc_lasso <- auc(roc_lasso)
+
+```
+
+
+```{r}	
+#| code-fold: true
+#| code-summary: display code to plot the ROC curve
+
+roc_data <- data.frame(
+    Fold = paste("Fold", 1),
+    Sensitivity = roc_lasso$sensitivities,
+    Specificity = 1 - roc_lasso$specificities
+)
+
+
+roc_plot <- ggplot(roc_data, aes(x = Specificity, y = Sensitivity)) +
+    geom_line(linewidth = 0.8, color = "#3459E6") +
+    geom_segment(x = 0, xend = 1, y = 0, yend = 1, linetype = "dashed", color = "gray") +
+    theme_minimal(base_size = 14) +
+    labs(
+        title = "ROC Curve for Lasso Model",
+        x = "1 - Specificity",
+        y = "Sensitivity"
+    ) +
+    theme(
+        plot.title = element_text(hjust = 0.5, size = 15, face = "bold"),
+        legend.position = "none"
+    ) +
+    coord_equal()
+
+ggplotly(roc_plot)
+```
+
+```{r}
+print(auc_lasso)
+```
+
+We found an AUC of around 0.71 for the Lasso model. This means that the model is able to distinguish between patients with and without an event 71% of the time. 
+
+```{r}
+lasso_coefficients <- coef(cv.out, s = "lambda.min")
+lasso_coefficients_df <- as.data.frame(as.matrix(lasso_coefficients))
+lasso_coefficients_df$variable <- rownames(lasso_coefficients_df)
+colnames(lasso_coefficients_df) <- c("coefficient", "variable")
+
+# Filter out variables with non-zero coefficients
+important_variables <- subset(lasso_coefficients_df, coefficient != 0)
+kable(important_variables)
+```
+
+We see that some variables have positive coefficiens, while others have negative coefficients. This means that the model considers some variables as positively correlated with the event (albuminmacro, IMT, STENOSISyes, log(CREAT), DIABETESyes, SMOKINGformer), while others are negatively correlated (HDL, SMOKINGcurrent, alcoholcurrent). Also, some variables like AGE or HOMOC have smaller coefficients, but this can be due to the unit of the variable (e.g. AGE is in years, HOMOC is in µmol/L).
+
+## Stepwise backward variable selection
+
+```{r}
+#| output: false
+stepwise_backward <- step(
+    glm(
+        formula,
+        data = train_data,
+        family = "binomial"
+    ),
+    direction = "backward"
+)
+stepwise_backward_pred <- predict(
+    stepwise_backward,
+    newdata = test_data,
+    type = "response"
+)
+
 ```
