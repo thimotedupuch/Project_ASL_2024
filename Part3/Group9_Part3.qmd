@@ -39,11 +39,10 @@ library(forcats)
 library(glmnet)
 library(pROC)
 library(knitr)
-
+library(caret)
+library(boot)
 library(ggplot2)
 library(plotly)
-
-
 ```
 
 
@@ -137,13 +136,53 @@ mean((lasso.pred - (as.numeric(test_data$EVENT) - 1))^2)
 plot(cv.out)
 ```
 
+### Final model
+
+```{r}
+whole_data <- dataset
+
+grid <- 10^seq(10, -2, length = 100)
+lasso_final.mod <- cv.glmnet(
+    x = model.matrix(formula, data = whole_data)[, -1],
+    y = as.numeric(whole_data$EVENT) - 1,
+    alpha = 1,
+    family = "binomial",
+    nfolds = 10,
+    lambda = grid
+)
+
+cv.out <- cv.glmnet(
+    x = model.matrix(formula, data = whole_data)[, -1],
+    y = as.numeric(whole_data$EVENT) - 1,
+    alpha = 1,
+    family = "binomial",
+    nfolds = 10,
+    lambda = grid
+)
+
+best_lambda <- cv.out$lambda.min
+lasso_final.pred <- predict(lasso_final.mod,
+    s = best_lambda,
+    newx = model.matrix(formula, data = whole_data)[, -1], type = "response"
+)
+
+# Mean squared error
+mean((lasso_final.pred - (as.numeric(whole_data$EVENT) - 1))^2)
+
+```
+
+
 ### Performance of the model
 
 
 ```{r}	
 #| output: false
+
 roc_lasso <- roc(test_data$EVENT, lasso.pred)
 auc_lasso <- auc(roc_lasso)
+
+roc_lasso_final <- roc(whole_data$EVENT, lasso_final.pred)
+auc_lasso_final <- auc(roc_lasso_final)
 
 ```
 
@@ -153,14 +192,13 @@ auc_lasso <- auc(roc_lasso)
 #| code-summary: display code to plot the ROC curve
 
 roc_data <- data.frame(
-    Fold = paste("Fold", 1),
-    Sensitivity = roc_lasso$sensitivities,
-    Specificity = 1 - roc_lasso$specificities
+    Sensitivity = c(roc_lasso_final$sensitivities, roc_lasso$sensitivities),
+    Specificity = c(1 - roc_lasso_final$specificities, 1 - roc_lasso$specificities),
+    Model = c(rep("Lasso Final Model", length(roc_lasso_final$sensitivities)), rep("Lasso Train-Test", length(roc_lasso$sensitivities)))
 )
 
-
-roc_plot <- ggplot(roc_data, aes(x = Specificity, y = Sensitivity)) +
-    geom_line(linewidth = 0.8, color = "#3459E6") +
+roc_plot <- ggplot(roc_data, aes(x = Specificity, y = Sensitivity, color = Model)) +
+    geom_line(linewidth = 0.8) +
     geom_segment(x = 0, xend = 1, y = 0, yend = 1, linetype = "dashed", color = "gray") +
     theme_minimal(base_size = 14) +
     labs(
@@ -170,7 +208,7 @@ roc_plot <- ggplot(roc_data, aes(x = Specificity, y = Sensitivity)) +
     ) +
     theme(
         plot.title = element_text(hjust = 0.5, size = 15, face = "bold"),
-        legend.position = "none"
+        legend.position = "right"
     ) +
     coord_equal()
 
@@ -179,9 +217,10 @@ ggplotly(roc_plot)
 
 ```{r}
 print(auc_lasso)
+print(auc_lasso_final)
 ```
 
-We found an AUC of around 0.71 for the Lasso model. This means that the model is able to distinguish between patients with and without an event 71% of the time. 
+We found an AUC of around 0.73 for the Lasso model. This means that the model is able to distinguish between patients with and without an event 73% of the time. 
 
 ```{r}
 lasso_coefficients <- coef(cv.out, s = "lambda.min")
@@ -196,22 +235,145 @@ kable(important_variables)
 
 We see that some variables have positive coefficiens, while others have negative coefficients. This means that the model considers some variables as positively correlated with the event (albuminmacro, IMT, STENOSISyes, log(CREAT), DIABETESyes, SMOKINGformer), while others are negatively correlated (HDL, SMOKINGcurrent, alcoholcurrent). Also, some variables like AGE or HOMOC have smaller coefficients, but this can be due to the unit of the variable (e.g. AGE is in years, HOMOC is in µmol/L).
 
+
 ## Stepwise backward variable selection
 
 ```{r}
 #| output: false
+k <- 10
+folds <- createFolds(dataset$EVENT, k = k, list = TRUE, returnTrain = FALSE)
+roc_list <- list()
+auc_values <- numeric(k)
+
+
+for (i in 1:k) {
+    train_data <- dataset[-folds[[i]], ]
+    test_data <- dataset[folds[[i]], ]
+
+    stepwise_backward <- step(
+        glm(
+            formula,
+            data = train_data,
+            family = "binomial"
+        ),
+        direction = "backward"
+    )
+    stepwise_backward_pred <- predict(
+        stepwise_backward,
+        newdata = test_data,
+        type = "response"
+        )
+    roc_i <- roc(test_data$EVENT, stepwise_backward_pred)
+    roc_list[[i]] <- roc_i
+    auc_values[i] <- auc(roc_i)    
+}
+
+```
+
+
+```{r}
+#| code-fold: true
+#| code-summary: display code to plot the ROC curves
+roc_df <- do.call(rbind, lapply(1:length(roc_list), function(i) {
+    data.frame(
+        Fold = paste("Fold", i),
+        Sensitivity = roc_list[[i]]$sensitivities,
+        Specificity = 1 - roc_list[[i]]$specificities
+    )
+}))
+
+roc_plot_stepwise_back_cv <- ggplot(roc_df, aes(x = Specificity, y = Sensitivity, color = Fold)) +
+    geom_line(linewidth = 0.8) +
+    geom_segment(x = 0, xend = 1, y = 0, yend = 1, linetype = "dashed", color = "gray") +
+    scale_color_brewer(palette = "Set3") +
+    theme_minimal(base_size = 14) +
+    labs(
+        title = "ROC Curves for Each Fold, \n Stepwise backward variable selection - Cross validation",
+        x = "1 - Specificity",
+        y = "Sensitivity",
+        color = "Fold"
+    ) +
+    theme(
+        plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+        legend.position = "bottom"
+    ) +
+    coord_equal()
+
+ggplotly(roc_plot_stepwise_back_cv)
+
+```
+
+
+```{r}	
+auc_table <- data.frame(Iteration = 1:k, AUC = auc_values)
+mean_auc <- mean(auc_values)
+auc_table$AUC <- round(auc_table$AUC, 4)
+mean_auc <- round(mean_auc, 4)
+auc_table <- rbind(auc_table, c("AUC mean", mean_auc))
+kable(auc_table, caption = "AUC Values for 10-Fold Cross-Validation")
+```
+
+```{r}	
+(auc_confidence_interval = t.test(auc_values)$conf.int)
+```
+
+
+### Final model
+
+
+```{r}	
+#| output: false
 stepwise_backward <- step(
     glm(
         formula,
-        data = train_data,
+        data = whole_data,
         family = "binomial"
     ),
     direction = "backward"
 )
 stepwise_backward_pred <- predict(
     stepwise_backward,
-    newdata = test_data,
+    newdata = whole_data,
     type = "response"
 )
 
+roc_stepwise_backward <- roc(whole_data$EVENT, stepwise_backward_pred)
+auc_stepwise_backward <- auc(roc_stepwise_backward)
+
 ```
+
+```{r}
+#| code-fold: true
+#| code-summary: display code to plot the ROC curve
+roc_plot_stepwise_final <- ggplot(data.frame(
+    Sensitivity = roc_stepwise_backward$sensitivities,
+    Specificity = 1 - roc_stepwise_backward$specificities
+), aes(x = Specificity, y = Sensitivity)) +
+    geom_line(linewidth = 0.8, color = "#3459E6") +
+    geom_segment(x = 0, xend = 1, y = 0, yend = 1, linetype = "dashed", color = "gray") +
+    theme_minimal(base_size = 14) +
+    labs(
+        title = "ROC Curve final model \n Stepwise backward variable selection",
+        x = "1 - Specificity",
+        y = "Sensitivity"
+    ) +
+    theme(
+        plot.title = element_text(hjust = 0.5, size = 15, face = "bold")
+    ) +
+    coord_equal()
+
+ggplotly(roc_plot_stepwise_final)
+print(auc_stepwise_backward)
+```
+
+```{r}	
+stepwise_backward_variables <- stepwise_backward$anova
+stepwise_backward_variables
+```
+
+The variables included in the final model are SEX, DIABETES and alcohol.
+SEX has the smallest contribution to the deviance (0.0475), which suggests it's the least influential in terms of explaining the variability in the outcome. DIABETES has a larger deviance (1.35), making it more important than SEX. Alcohol has the largest deviance (3.91), indicating that it explains the largest portion of the model's fit.
+
+
+## Bootstrap validation
+
