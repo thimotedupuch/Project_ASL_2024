@@ -377,3 +377,47 @@ SEX has the smallest contribution to the deviance (0.0475), which suggests it's 
 
 ## Bootstrap validation
 
+```{r}	
+#| output: false
+# Function to fit the model and calculate the AUC using bootstrap method
+boot_auc <- function(data, indices) {
+    boot_data <- data[indices, ]
+    stepwise_backward <- step(
+        glm(
+            formula,
+            data = boot_data,
+            family = "binomial"
+        ),
+        direction = "backward",
+        trace = 0
+    )
+    stepwise_backward_pred <- predict(
+        stepwise_backward,
+        newdata = boot_data,
+        type = "response"
+    )
+    roc_i <- roc(boot_data$EVENT, stepwise_backward_pred)
+    return(auc(roc_i))
+}
+
+set.seed(123)
+B <- 10
+boot_results <- boot(data = whole_data, statistic = boot_auc, R = B)
+auc_values_bootstrap <- boot_results$t
+```
+
+```{r}
+auc_table_bootstrap <- data.frame(Iteration = 1:B, AUC = auc_values_bootstrap)
+mean_auc_bootstrap <- mean(auc_values_bootstrap)
+auc_table_bootstrap$AUC <- round(auc_table_bootstrap$AUC, 4)
+mean_auc_bootstrap <- round(mean_auc_bootstrap, 4)
+auc_table_bootstrap <- rbind(auc_table_bootstrap, c("AUC mean", mean_auc_bootstrap))
+kable(auc_table_bootstrap, caption = "AUC Values for Bootstrap Validation")
+
+```
+
+```{r}
+(auc_confidence_interval_bootstrap = t.test(auc_values_bootstrap)$conf.int)
+```
+
+Based on the boostrap method for validation, we found an AUC with a confidence interval of [0.737, 0.752]. With cross-validation, we found an AUC with a confidence interval of [0.707 0.741]. The confidence intervals overlap, which suggests that the two methods are consistent with each other, but the bootstrap method provides a slightly higher AUC.
