@@ -18,7 +18,7 @@ format:
     html:
         embed-resources: true
         df-print: paged
-        monofont: JetBrainsMono NF SemiBold
+        monofont: monospace
         theme: zephyr
         highlight-style: github
 
@@ -212,7 +212,7 @@ roc_plot <- ggplot(roc_data, aes(x = Specificity, y = Sensitivity, color = Model
     ) +
     coord_equal()
 
-ggplotly(roc_plot)
+roc_plot
 ```
 
 ```{r}
@@ -299,7 +299,7 @@ roc_plot_stepwise_back_cv <- ggplot(roc_df, aes(x = Specificity, y = Sensitivity
     ) +
     coord_equal()
 
-ggplotly(roc_plot_stepwise_back_cv)
+roc_plot_stepwise_back_cv
 
 ```
 
@@ -362,17 +362,26 @@ roc_plot_stepwise_final <- ggplot(data.frame(
     ) +
     coord_equal()
 
-ggplotly(roc_plot_stepwise_final)
+roc_plot_stepwise_final
 print(auc_stepwise_backward)
 ```
+
+```{r}
+stepwise_backward$coefficients
+```
+
+AGE, BMI, SYSTH, HDL, HOMOC, log(CREAT), STENOSISyes, IMT, SMOKINGformer, SMOKINGcurrent, albuminmicro and albuminmacro are included in the final model. Those are the most important variables for predicting the event.
 
 ```{r}	
 stepwise_backward_variables <- stepwise_backward$anova
 stepwise_backward_variables
 ```
 
-The variables included in the final model are SEX, DIABETES and alcohol.
-SEX has the smallest contribution to the deviance (0.0475), which suggests it's the least influential in terms of explaining the variability in the outcome. DIABETES has a larger deviance (1.35), making it more important than SEX. Alcohol has the largest deviance (3.91), indicating that it explains the largest portion of the model's fit.
+We see that the variables AGE, DIABETES and alcohol were removed from the final model. This means that the model considers these variables as less important for predicting the event.
+
+
+
+
 
 
 ## Bootstrap validation
