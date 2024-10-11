@@ -1,0 +1,95 @@
+---
+title: Project Part 4
+date: today
+subtitle: "Group 9"
+
+authors:
+  - name: Thimoté Dupuch
+    affiliation: University of Twente
+    email: t.dupuch@student.utwente.nl
+  - name: Joris van Lierop
+    affiliation: University of Twente
+    email: j.j.w.vanlierop@student.utwente.nl
+  - name: Jurre van Sijpveld
+    affiliation: University of Twente
+    email: j.vansijpveld@student.utwente.nl
+
+format:
+    html:
+        embed-resources: true
+        df-print: paged
+        monofont: monospace
+        theme: zephyr
+        highlight-style: github
+
+toc: true
+toc-depth: 3
+toc-expand: true
+toc-location: right
+---
+
+## Loading libraries
+
+
+```{r}
+#| output: false
+library(tidyverse)
+library(data.table)
+library(randomForestSRC)
+```
+
+
+## Loading data
+
+```{r}
+dataset <- fread("SMARTc.csv",sep = ";")
+```
+
+
+
+## Re-encode the categorical variables
+
+```{r}	
+dataset <- mutate(dataset,
+    EVENT = factor(EVENT),
+    EVENT = fct_recode(EVENT, "no" = "0", "yes" = "1"),
+    SEX = factor(SEX),
+    SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
+    DIABETES = factor(DIABETES),
+    DIABETES = fct_recode(DIABETES, "no" = "0", "yes" = "1"),
+    SMOKING = factor(SMOKING),
+    SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
+    alcohol = factor(alcohol),
+    alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
+    CEREBRAL = factor(CEREBRAL),
+    CEREBRAL = fct_recode(CEREBRAL, "no" = "0", "yes" = "1"),
+    CARDIAC = factor(CARDIAC),
+    CARDIAC = fct_recode(CARDIAC, "no" = "0", "yes" = "1"),
+    AAA = factor(AAA),
+    AAA = fct_recode(AAA, "no" = "0", "yes" = "1"),
+    PERIPH = factor(PERIPH),
+    PERIPH = fct_recode(PERIPH, "no" = "0", "yes" = "1"),
+    albumin = factor(albumin),
+    albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
+    STENOSIS = factor(STENOSIS),
+    STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
+)
+```
+
+
+
+```{r}
+tune <- tune.rfsrc(EVENT ~ ., data = dataset, ntree = 100, nodedepth = 5, seed = 123)
+print(tune$optimal)
+
+```
+
+```{r}
+my_random_forest <- rfsrc(EVENT ~ ., data = dataset, ntree = 100, nodedepth = 5, seed = 123, nodesize = 1, mtry = 6)
+print(my_random_forest)
+```
+
+
+```{r}
+plot(my_random_forest)
+```
