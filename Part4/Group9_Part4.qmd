@@ -36,6 +36,7 @@ toc-location: right
 library(tidyverse)
 library(data.table)
 library(randomForestSRC)
+library(pROC)
 ```
 
 
@@ -50,46 +51,81 @@ dataset <- fread("SMARTc.csv",sep = ";")
 ## Re-encode the categorical variables
 
 ```{r}	
-dataset <- mutate(dataset,
-    EVENT = factor(EVENT),
-    EVENT = fct_recode(EVENT, "no" = "0", "yes" = "1"),
-    SEX = factor(SEX),
-    SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
-    DIABETES = factor(DIABETES),
-    DIABETES = fct_recode(DIABETES, "no" = "0", "yes" = "1"),
-    SMOKING = factor(SMOKING),
-    SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
-    alcohol = factor(alcohol),
-    alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
-    CEREBRAL = factor(CEREBRAL),
-    CEREBRAL = fct_recode(CEREBRAL, "no" = "0", "yes" = "1"),
-    CARDIAC = factor(CARDIAC),
-    CARDIAC = fct_recode(CARDIAC, "no" = "0", "yes" = "1"),
-    AAA = factor(AAA),
-    AAA = fct_recode(AAA, "no" = "0", "yes" = "1"),
-    PERIPH = factor(PERIPH),
-    PERIPH = fct_recode(PERIPH, "no" = "0", "yes" = "1"),
-    albumin = factor(albumin),
-    albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
-    STENOSIS = factor(STENOSIS),
-    STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
-)
+#dataset <- mutate(dataset,
+#    EVENT = factor(EVENT),
+#    EVENT = fct_recode(EVENT, "no" = "0", "yes" = "1"),
+#    SEX = factor(SEX),
+#    SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
+#    DIABETES = factor(DIABETES),
+#    DIABETES = fct_recode(DIABETES, "no" = "0", "yes" = "1"),
+#    SMOKING = factor(SMOKING),
+#    SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
+#    alcohol = factor(alcohol),
+#    alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
+#    CEREBRAL = factor(CEREBRAL),
+#    CEREBRAL = fct_recode(CEREBRAL, "no" = "0", "yes" = "1"),
+#    CARDIAC = factor(CARDIAC),
+#    CARDIAC = fct_recode(CARDIAC, "no" = "0", "yes" = "1"),
+#    AAA = factor(AAA),
+#    AAA = fct_recode(AAA, "no" = "0", "yes" = "1"),
+#    PERIPH = factor(PERIPH),
+#    PERIPH = fct_recode(PERIPH, "no" = "0", "yes" = "1"),
+#    albumin = factor(albumin),
+#    albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
+#    STENOSIS = factor(STENOSIS),
+#    STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
+#)
 ```
 
 
+```{r}
+dataset_rf <- dataset[,!"TEVENT"]
+
+# Splitting the data
+train_sample <- sample(1:nrow(dataset_rf), nrow(dataset_rf) * 0.7)
+train_data_rf <- dataset_rf[train_sample, ]
+test_data_rf <- dataset_rf[-train_sample, ]
+
+
+
+```
+
 
 ```{r}
-tune <- tune.rfsrc(EVENT ~ ., data = dataset, ntree = 100, nodedepth = 5, seed = 123)
+tune <- tune.rfsrc(EVENT ~ ., data = train_data_rf, ntree = 100, nodedepth = 5, seed = 123)
 print(tune$optimal)
 
 ```
 
 ```{r}
-my_random_forest <- rfsrc(EVENT ~ ., data = dataset, ntree = 100, nodedepth = 5, seed = 123, nodesize = 1, mtry = 6)
+my_random_forest <- rfsrc(EVENT ~ ., data = train_data_rf, 
+  ntree = 100, 
+  nodedepth = 5, 
+  seed = 123, 
+  nodesize = 1, 
+  mtry = 16, 
+  importance = TRUE)
 print(my_random_forest)
+print(my_random_forest$importance)
 ```
 
 
 ```{r}
 plot(my_random_forest)
 ```
+
+
+```{r}
+
+o.pred <- predict(my_random_forest, test_data_rf, OOB=TRUE)
+
+
+
+roc <- roc(test_data_rf$EVENT, o.pred$predicted)
+plot(roc, col = "blue", lwd = 2, main = "ROC curve")
+
+auc <- auc(roc)
+print(auc)
+
+```
+
