@@ -43,89 +43,89 @@ library(pROC)
 ## Loading data
 
 ```{r}
-dataset <- fread("SMARTc.csv",sep = ";")
+dataset <- fread("SMARTc.csv", sep = ";")
 ```
 
 
+# Random Forest Classification
 
-## Re-encode the categorical variables
-
-```{r}	
-#dataset <- mutate(dataset,
-#    EVENT = factor(EVENT),
-#    EVENT = fct_recode(EVENT, "no" = "0", "yes" = "1"),
-#    SEX = factor(SEX),
-#    SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
-#    DIABETES = factor(DIABETES),
-#    DIABETES = fct_recode(DIABETES, "no" = "0", "yes" = "1"),
-#    SMOKING = factor(SMOKING),
-#    SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
-#    alcohol = factor(alcohol),
-#    alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
-#    CEREBRAL = factor(CEREBRAL),
-#    CEREBRAL = fct_recode(CEREBRAL, "no" = "0", "yes" = "1"),
-#    CARDIAC = factor(CARDIAC),
-#    CARDIAC = fct_recode(CARDIAC, "no" = "0", "yes" = "1"),
-#    AAA = factor(AAA),
-#    AAA = fct_recode(AAA, "no" = "0", "yes" = "1"),
-#    PERIPH = factor(PERIPH),
-#    PERIPH = fct_recode(PERIPH, "no" = "0", "yes" = "1"),
-#    albumin = factor(albumin),
-#    albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
-#    STENOSIS = factor(STENOSIS),
-#    STENOSIS = fct_recode(STENOSIS, "no" = "0", "yes" = "1"),
-#)
-```
-
-
+## Split data into training and test set
 ```{r}
-dataset_rf <- dataset[,!"TEVENT"]
-
-# Splitting the data
+dataset_rf <- dataset[, !"TEVENT"]
+set.seed(123)
 train_sample <- sample(1:nrow(dataset_rf), nrow(dataset_rf) * 0.7)
 train_data_rf <- dataset_rf[train_sample, ]
 test_data_rf <- dataset_rf[-train_sample, ]
+```
 
 
+## Hyperparameter tuning
+```{r}
+tune <- tune.rfsrc(EVENT ~ .,
+    data = train_data_rf,
+    ntree = 100, nodedepth = 5, seed = 123
+)
 
 ```
 
 
+## Random Forest model - training
 ```{r}
-tune <- tune.rfsrc(EVENT ~ ., data = train_data_rf, ntree = 100, nodedepth = 5, seed = 123)
-print(tune$optimal)
-
-```
-
-```{r}
-my_random_forest <- rfsrc(EVENT ~ ., data = train_data_rf, 
-  ntree = 100, 
-  nodedepth = 5, 
-  seed = 123, 
-  nodesize = 1, 
-  mtry = 16, 
-  importance = TRUE)
+my_random_forest <- rfsrc(EVENT ~ .,
+    data = train_data_rf,
+    ntree = 100,
+    nodedepth = 5,
+    seed = 123,
+    nodesize = tune$optimal["nodesize"],
+    mtry = tune$optimal["mtry"],
+    importance = TRUE
+)
 print(my_random_forest)
-print(my_random_forest$importance)
 ```
 
 
 ```{r}
-plot(my_random_forest)
+#| code-fold: true
+plot.rfsrc(my_random_forest, plots.one.page = FALSE, pin = c(3, 3), cex = 0.7)
 ```
 
 
+
+## Random Forest model - predictive ability
 ```{r}
-
-o.pred <- predict(my_random_forest, test_data_rf, OOB=TRUE)
-
-
-
+o.pred <- predict(my_random_forest, test_data_rf, OOB = TRUE)
 roc <- roc(test_data_rf$EVENT, o.pred$predicted)
-plot(roc, col = "blue", lwd = 2, main = "ROC curve")
-
 auc <- auc(roc)
+plot(roc, col = "blue", lwd = 2, main = "ROC curve")
 print(auc)
-
 ```
 
+## Final model - Whole dataset
+
+```{r}
+
+final_model_params <- tune.rfsrc(EVENT ~ .,
+    data = dataset_rf,
+    ntree = 100, nodedepth = 5, seed = 123
+)
+
+final_model <- rfsrc(EVENT ~ .,
+    data = dataset_rf,
+    ntree = 100,
+    nodedepth = 5,
+    seed = 123,
+    nodesize = final_model_params$optimal["nodesize"],
+    mtry = final_model_params$optimal["mtry"],
+    importance = TRUE
+)
+
+print(final_model)
+
+roc_final <- roc(dataset_rf$EVENT, predict(final_model, dataset_rf)$predicted)
+auc_final <- auc(roc_final)
+plot(roc_final, col = "blue", lwd = 2, main = "ROC curve")
+print(auc_final)
+```
+
+
+# Cox regression
