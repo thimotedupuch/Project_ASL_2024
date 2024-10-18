@@ -30,46 +30,25 @@ toc-location: right
 
 ```{r}
 #| output: false
-library(tidyverse)  # For data manipulation
-library(knitr)      # For tables
-library(caret)      # For model training
-library(pROC)       # For ROC analysis
-library(MASS)       # For stepAIC
-library(boot)       # For bootstrapping
-library(survival)   # For survival analysis
-library(rms)        # For validating Cox model
-library(glmnet)     # For lasso and ridge regression
+library(tidyverse) # For data manipulation
+library(knitr) # For tables
+library(caret) # For model training
+library(pROC) # For ROC analysis
+library(MASS) # For stepAIC
+library(boot) # For bootstrapping
+library(survival) # For survival analysis
+library(rms) # For validating Cox model
+library(glmnet) # For lasso and ridge regression
 library(data.table) # For faster CSV read
 ```
 
 
-### Load dataset and re-encode variables
+### Load dataset (and re-encode variables, not needed)
 ```{r}
 Patients <- fread("SMARTc.csv", sep = ";")
-
-Patients <- mutate(Patients, SEX = factor(SEX), 
-                   SEX = fct_recode(SEX, "male" = "1", "female" = "2"),
-                   DIABETES = factor(DIABETES),
-                   DIABETES = fct_recode(DIABETES, "No" = "0", "Yes" = "1"),
-                   SMOKING = factor(SMOKING),
-                   SMOKING = fct_recode(SMOKING, "never" = "1", "former" = "2", "current" = "3"),
-                   alcohol = factor(alcohol),
-                   alcohol = fct_recode(alcohol, "never" = "1", "former" = "2", "current" = "3"),
-                   CEREBRAL = factor(CEREBRAL),
-                   CEREBRAL = fct_recode(CEREBRAL, "No" = "0", "Yes" = "1"),
-                   CARDIAC = factor(CARDIAC),
-                   CARDIAC = fct_recode(CARDIAC, "No" = "0", "Yes" = "1"),
-                   AAA = factor(AAA),
-                   AAA = fct_recode(AAA, "No" = "0", "Yes" = "1"),
-                   PERIPH = factor(PERIPH),
-                   PERIPH = fct_recode(PERIPH, "No" = "0", "Yes" = "1"),
-                   albumin = factor(albumin),
-                   albumin = fct_recode(albumin, "no" = "1", "micro" = "2", "macro" = "3"),
-                   STENOSIS = factor(STENOSIS),
-                   STENOSIS = fct_recode(STENOSIS, "No" = "0", "Yes" = "1"))
-final_patients <- Patients %>% 
-  mutate(log_CREAT = log(CREAT)) %>%
-  subset(select = -c(HISTCARD, HISTCAR2, CREAT))
+final_patients <- Patients %>%
+    mutate(log_CREAT = log(CREAT)) %>%
+    subset(select = -c(HISTCARD, HISTCAR2, CREAT))
 ```
 
 
@@ -78,27 +57,11 @@ final_patients <- Patients %>%
 ```{r}
 #| output: false
 surv_object <- Surv(time = final_patients$TEVENT, event = final_patients$EVENT)
-
 surv_fit_formula <- surv_object ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
 
 initial_cox_model <- coxph(surv_fit_formula, data = final_patients)
 stepwise_cox_model <- stepAIC(initial_cox_model, direction = "backward")
 ```
-
-
-
-### Step 3: Visualizing AIC progression (remove this step)
-```{r}
-aic_values <- stepwise_cox_model$anova[, "AIC"]  # Extract AIC values
-
-(stepwise_cox_model$anova)
-```
-
-```{r}
-plot(aic_values, type = "b", xlab = "Number of Variables", ylab = "AIC", main = "AIC values for stepwise Cox model")
-
-```
-
 
 ```{r}
 summary(stepwise_cox_model)
@@ -110,8 +73,13 @@ summary(stepwise_cox_model)
 ```{r}
 final_coefficients <- coef(stepwise_cox_model)
 print(final_coefficients)
+```
+
+
 
 # Step 6: Calculate concordance index for the final model
+
+```{r}
 final_surv <- Surv(time = final_patients$TEVENT, event = final_patients$EVENT)
 final_surv_fit_formula <- final_surv ~ predict(stepwise_cox_model, newdata = final_patients)
 final_cox_model <- coxph(final_surv_fit_formula, data = final_patients)
@@ -121,7 +89,7 @@ print(paste("Concordance Index:", concordance_index))
 
 # Step 7: Summary of the final model and exponentiated coefficients
 ```{r}
-summary(stepwise_cox_model)
+summary(final_cox_model)
 exp(final_coefficients)
 ```
 
@@ -134,57 +102,49 @@ folds <- createFolds(final_patients$EVENT, k = 10, list = TRUE, returnTrain = TR
 cv_concordance_indices <- numeric(10)
 
 for (i in 1:10) {
-  # Split the data into training and testing sets
-  train_data <- final_patients[folds[[i]], ]
-  test_data <- final_patients[-folds[[i]], ]
-  
-  # Create the survival object for training data
-  surv_train <- Surv(time = train_data$TEVENT, event = train_data$EVENT)
-  surv_fit_formula <- surv_train ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
-  
-  # Fit the Cox model on the training data
-  cox_model <- coxph(surv_fit_formula, data = train_data)
-  
-  # Predict on the test data
-  test_surv <- Surv(time = test_data$TEVENT, event = test_data$EVENT)
-  predictions <- predict(cox_model, newdata = test_data)
-  
-  cv_concordance_indices[i] <- coxph(test_surv ~ predictions, data = test_data)$concordance
+    # Split the data into training and testing sets
+    train_data <- final_patients[folds[[i]], ]
+    test_data <- final_patients[-folds[[i]], ]
+
+    # Create the survival object for training data
+    surv_train <- Surv(time = train_data$TEVENT, event = train_data$EVENT)
+    surv_fit_formula <- surv_train ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
+
+    # Fit the Cox model on the training data
+    cox_model <- coxph(surv_fit_formula, data = train_data)
+
+    # Predict on the test data
+    test_surv <- Surv(time = test_data$TEVENT, event = test_data$EVENT)
+    predictions <- predict(cox_model, newdata = test_data)
+
+    cv_concordance_indices[i] <- coxph(test_surv ~ predictions, data = test_data)$concordance
 }
 
-# Compute the average concordance index from cross-validation
 mean_concordance_cv <- mean(cv_concordance_indices)
-```
-
-
-
-# Print the cross-validated concordance index
-
-```{r}
-print(paste("Cross-validated Concordance Index:", mean_concordance_cv))
+mean_concordance_cv
 ```
 
 ```{r}
 #| output: false
 bootstrap_cox_model <- function(data, indices) {
-  resampled_data <- data[indices, ]
-  surv_object <- Surv(time = resampled_data$TEVENT, event = resampled_data$EVENT)
-  surv_fit_formula <- surv_object ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
-  
-  initial_cox_model <- coxph(surv_fit_formula, data = resampled_data)
-  stepwise_model <- stepAIC(initial_cox_model, direction = "backward", trace = FALSE)
-  all_vars <- colnames(data)[-c(1, 2)]
-  selected_vars <- names(coef(stepwise_model))
-  
-  # Create a binary vector: 1 if the variable is included, 0 otherwise
-  inclusion_vector <- as.integer(all_vars %in% selected_vars)
-  
-  return(inclusion_vector)
+    resampled_data <- data[indices, ]
+    surv_object <- Surv(time = resampled_data$TEVENT, event = resampled_data$EVENT)
+    surv_fit_formula <- surv_object ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
+
+    initial_cox_model <- coxph(surv_fit_formula, data = resampled_data)
+    stepwise_model <- stepAIC(initial_cox_model, direction = "backward", trace = FALSE)
+    all_vars <- colnames(data)[-c(1, 2)]
+    selected_vars <- names(coef(stepwise_model))
+
+    # Create a binary vector: 1 if the variable is included, 0 otherwise
+    inclusion_vector <- as.integer(all_vars %in% selected_vars)
+
+    return(inclusion_vector)
 }
 
 # Set the number of bootstrap samples
 set.seed(123)
-n_bootstrap_samples <- 20
+n_bootstrap_samples <- 100
 
 # Run bootstrapping
 bootstrap_results <- boot(data = final_patients, statistic = bootstrap_cox_model, R = n_bootstrap_samples)
@@ -194,8 +154,8 @@ bootstrap_results <- boot(data = final_patients, statistic = bootstrap_cox_model
 # Analyze results: Create a table of inclusion frequencies
 
 ```{r}
-inclusion_frequencies <- colMeans(bootstrap_results$t)  # Get inclusion proportions
-inclusion_variables = colnames(final_patients)[-c(1, 2)]
+inclusion_frequencies <- colMeans(bootstrap_results$t) # Get inclusion proportions
+inclusion_variables <- colnames(final_patients)[-c(1, 2)]
 inclusion_frequencies <- data.frame(Variable = inclusion_variables, Proportion = inclusion_frequencies)
 inclusion_frequencies
 ```
@@ -205,10 +165,12 @@ inclusion_frequencies
 
 ```{r}
 ggplot(inclusion_frequencies, aes(x = reorder(Variable, -Proportion), y = Proportion)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  labs(title = "Variable Inclusion Frequencies in Bootstrapped Cox Models",
-       x = "Predictor Variables",
-       y = "Proportion of Inclusion") +
-  theme_minimal()
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(
+        title = "Variable Inclusion Frequencies in Bootstrapped Cox Models",
+        x = "Predictor Variables",
+        y = "Proportion of Inclusion"
+    ) +
+    theme_minimal()
 ```
