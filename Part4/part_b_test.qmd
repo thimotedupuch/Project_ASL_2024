@@ -52,7 +52,7 @@ final_patients <- Patients %>%
 ```
 
 
-# Step 2: Cox model with stepwise selection
+# Cox model with stepwise selection
 
 ```{r}
 #| output: false
@@ -68,16 +68,35 @@ summary(stepwise_cox_model)
 ```
 
 
-# Step 5: Extracting coefficients from the final model
+The "Coef" represents the levels of risk. With a negative coefficient, we know the variable has a decreased risk on the event, and a positive coefficient indicates an increased risk on EVENT. Subsequently, when looking at exp(coef), we conclude that a ratio bigger than 1 means an increased risk and a ration smaller than 1 means a decreased risk.
+For instance, we see that diabetes has a positive coefficient 0.304, with ratio 1.355. People with diabetes thus have a 35.5% higher risk of EVENT, which is also significant with p=0.00501
+
+Below, we see that for instance for log_CREAT, the hazard ratio is 2.722 with a 95% confidence interval of (2.224, 3.331).
+
+The level of concordance with 0.684 says how well the model predicts. An accuracy of 68.4% is quite well. We also see that the model is overall highly significant with the very low p-values.
+
+
+# Extracting coefficients from the final model
 
 ```{r}
 final_coefficients <- coef(stepwise_cox_model)
 print(final_coefficients)
 ```
 
+The coefficients above are log-hazard ratios, and we can calculate the hazard ratio by exponentiating each coefficient:
+Hazard Ratio (HR) = ecoefficient
+
+This means per variable, that risk is increased or decreased if the predictor variable increased. Below, the changes and Hazard ratios per variable are shortly outlined.
+SEX (-0.379): e^(-0.379) = 0,684. This means that a 1-unit change (male to female) lowers the risk of occurring event with around 32%.
+DIABETES (0.304): e^(0.304) = 1.355. This means that having diabetes increases the hazard. Having diabetes is associated with 35.5% higher risk of the event occurring.
+SYSTH (0.017): e^(0.017) = 1.017. This indicates a 1.7% risk increase for each unit increase of the systolic blood pressure.
+WEIGHT (-0.009): e^(-0.009) = 0.991.  For interpretation of this, each unit of increase in weight means a 0.9% lower risk of event occurring.
+LDL (0.103): e^(0.103) = 1.109. This tells us that there’s a 10.9% higher risk of event occurring for each unit increase n LDL cholesterol.
+log_CREAT (1.002) = e^(1.002) = 2.724. This indicates a 172.4% higher risk of event occurring for each 1-unit increase of the log-transformed creatinine.
+Concluding. Some factors like diabetes, LDL and creatinine significantly increase the risk of occurring when unit of measuring change, while others might reduce the risk. Understanding how these variables interact with the outcome helps guide medical or practical decisions related to the modeled event.
 
 
-# Step 6: Calculate concordance index for the final model
+# Calculate concordance index for the final model
 
 ```{r}
 final_surv <- Surv(time = final_patients$TEVENT, event = final_patients$EVENT)
@@ -87,13 +106,19 @@ concordance_index <- final_cox_model$concordance
 print(paste("Concordance Index:", concordance_index))
 ```
 
-# Step 7: Summary of the final model and exponentiated coefficients
+We see from the output 7 different concordance levels. We see that the 1st to the 5th are not possible and the 7th isn't possible either. We conclude to have a concordance level of 0.648
+
+# Summary of the final model and exponentiated coefficients
 ```{r}
 summary(final_cox_model)
 exp(final_coefficients)
 ```
 
-# Step 8: Cross-validation of the Cox model
+The main takeaways of this summary are that the concordance indext of 0.648 suggests moderate predictive ability. This means that the model can differentiate between high- and low-risk individuals about 68.4% of the time.
+On top of that, the complete model is statistically significant (z-score of 13.91 and p-value of <2e^(-16)). 
+Lastly, as already explained in previous steps, the hazard ratios are again mentioned indicating increases and decreases in event occurring risks for 1-unit variable changes.
+
+# Cross-validation of the Cox model
 
 ```{r}
 #| output: false
@@ -174,3 +199,5 @@ ggplot(inclusion_frequencies, aes(x = reorder(Variable, -Proportion), y = Propor
     ) +
     theme_minimal()
 ```
+
+This code and visualisations above involves bootstrapping the Cox proportional hazards model multiple times, and tracks how frequently each variable is selected (i.e., included) in the model across different bootstrap iterations. The variable inclusion frequency plot shows how often each predictor was selected across multiple bootstrapped Cox models. It can be seen that variables like SYSTH, log_CREAT, and SEX were included more frequently, indicating they have a stronger or more consistent effect on the outcome.

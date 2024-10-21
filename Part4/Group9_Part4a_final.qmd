@@ -1,0 +1,142 @@
+---
+title: Project Part 4
+date: today
+subtitle: "Group 9"
+
+authors:
+  - name: Thimoté Dupuch
+    affiliation: University of Twente
+    email: t.dupuch@student.utwente.nl
+  - name: Joris van Lierop
+    affiliation: University of Twente
+    email: j.j.w.vanlierop@student.utwente.nl
+  - name: Jurre van Sijpveld
+    affiliation: University of Twente
+    email: j.vansijpveld@student.utwente.nl
+
+format:
+    html:
+        embed-resources: true
+        df-print: paged
+        monofont: monospace
+        theme: zephyr
+        highlight-style: github
+
+toc: true
+toc-depth: 3
+toc-expand: true
+toc-location: right
+---
+
+## Loading libraries
+
+
+```{r}
+#| output: false
+
+library(tidyverse)
+library(data.table)
+library(randomForestSRC)
+library(pROC)
+```
+
+
+## Loading data
+
+```{r}
+dataset <- fread("SMARTc.csv", sep = ";")
+```
+
+
+# Random Forest Classification
+
+## Split data into training and test set
+```{r}
+dataset_rf <- dataset[, !"TEVENT"]
+set.seed(123)
+train_sample <- sample(1:nrow(dataset_rf), nrow(dataset_rf) * 0.7)
+train_data_rf <- dataset_rf[train_sample, ]
+test_data_rf <- dataset_rf[-train_sample, ]
+```
+
+
+## Hyperparameter tuning
+```{r}
+tune <- tune.rfsrc(EVENT ~ .,
+    data = train_data_rf,
+    ntree = 100, nodedepth = 5, seed = 123
+)
+
+```
+
+
+## Random Forest model - training
+```{r}
+my_random_forest <- rfsrc(EVENT ~ .,
+    data = train_data_rf,
+    ntree = 100,
+    nodedepth = 5,
+    seed = 123,
+    nodesize = tune$optimal["nodesize"],
+    mtry = tune$optimal["mtry"],
+    importance = TRUE
+)
+print(my_random_forest)
+```
+
+
+```{r}
+#| code-fold: true
+plot.rfsrc(my_random_forest, plots.one.page = FALSE, pin = c(3, 3), cex = 0.7)
+```
+
+As we can see from the "number of trees" graph, the error rate decreases when the number of trees increases. From this, we can conclude that as the model grows in complexity, it becomes more accurate in making predictions.
+
+The Variable Importance Graph shows, as the name indicates, the variable importance of the different variables with regard to predicting the target varable EVENT. We see that for instance AGE has a high importance and CEREBRAL a very low importance.
+In the sequence of numbers below we show the actual numbers related to the importance for some extra insight. 
+
+## Random Forest model - predictive ability
+```{r}
+o.pred <- predict(my_random_forest, test_data_rf, OOB = TRUE)
+roc <- roc(test_data_rf$EVENT, o.pred$predicted)
+auc <- auc(roc)
+plot(roc, col = "blue", lwd = 2, main = "ROC curve")
+print(auc)
+```
+
+The graph above shows the ROC curve of the random forest model applied in this assignment. The curve rises above the diagonal grey line, indicating that our model is performing better than random guessing, logically. The AUC of our model resulted in an amount of 0.7196; This means that our Random Forest classifier is performing well.
+
+
+## Final model - Whole dataset
+
+```{r}
+
+final_model_params <- tune.rfsrc(EVENT ~ .,
+    data = dataset_rf,
+    ntree = 100, nodedepth = 5, seed = 123
+)
+
+final_model <- rfsrc(EVENT ~ .,
+    data = dataset_rf,
+    ntree = 100,
+    nodedepth = 5,
+    seed = 123,
+    nodesize = final_model_params$optimal["nodesize"],
+    mtry = final_model_params$optimal["mtry"],
+    importance = TRUE
+)
+
+print(final_model)
+
+roc_final <- roc(dataset_rf$EVENT, predict(final_model, dataset_rf)$predicted)
+auc_final <- auc(roc_final)
+plot(roc_final, col = "blue", lwd = 2, main = "ROC curve")
+print(auc_final)
+```
+
+
+In this case the random forest model is applied to our whole dataset with the parameters explained above. This resulted in a well-performing model on our data with an AUC of 0.824.
+
+
+# Cox regression
+

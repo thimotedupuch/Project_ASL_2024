@@ -33,6 +33,7 @@ toc-location: right
 
 ```{r}
 #| output: false
+
 library(tidyverse)
 library(data.table)
 library(randomForestSRC)
@@ -89,7 +90,10 @@ print(my_random_forest)
 plot.rfsrc(my_random_forest, plots.one.page = FALSE, pin = c(3, 3), cex = 0.7)
 ```
 
+As we can see from the "number of trees" graph, the error rate decreases when the number of trees increases. From this, we can conclude that as the model grows in complexity, it becomes more accurate in making predictions.
 
+The Variable Importance Graph shows, as the name indicates, the variable importance of the different variables with regard to predicting the target varable EVENT. We see that for instance AGE has a high importance and CEREBRAL a very low importance.
+In the sequence of numbers below we show the actual numbers related to the importance for some extra insight. 
 
 ## Random Forest model - predictive ability
 ```{r}
@@ -99,6 +103,9 @@ auc <- auc(roc)
 plot(roc, col = "blue", lwd = 2, main = "ROC curve")
 print(auc)
 ```
+
+The graph above shows the ROC curve of the random forest model applied in this assignment. The curve rises above the diagonal grey line, indicating that our model is performing better than random guessing, logically. The AUC of our model resulted in an amount of 0.7196; This means that our Random Forest classifier is performing well.
+
 
 ## Final model - Whole dataset
 
@@ -128,4 +135,195 @@ print(auc_final)
 ```
 
 
+In this case the random forest model is applied to our whole dataset with the parameters explained above. This resulted in a well-performing model on our data with an AUC of 0.824.
+
+In this case the random forest model is applied to our whole dataset with the parameters explained above. This resulted in a well-performing model on our data with an AUC of 0.824. We see from the value of this AUC that it is a bit 'too' good. This is because in this graph, we are testing the full final model, and are not separating the test and training data. This we do in the previous graph above.
+
+
+
 # Cox regression
+
+
+
+
+```{r}
+#| output: false
+library(tidyverse) # For data manipulation
+library(knitr) # For tables
+library(caret) # For model training
+library(pROC) # For ROC analysis
+library(MASS) # For stepAIC
+library(boot) # For bootstrapping
+library(survival) # For survival analysis
+library(rms) # For validating Cox model
+library(glmnet) # For lasso and ridge regression
+library(data.table) # For faster CSV read
+```
+
+
+### Load dataset (and re-encode variables, not needed)
+```{r}
+Patients <- fread("SMARTc.csv", sep = ";")
+final_patients <- Patients %>%
+    mutate(log_CREAT = log(CREAT)) %>%
+    subset(select = -c(HISTCARD, HISTCAR2, CREAT))
+```
+
+
+# Cox model with stepwise selection
+
+```{r}
+#| output: false
+surv_object <- Surv(time = final_patients$TEVENT, event = final_patients$EVENT)
+surv_fit_formula <- surv_object ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
+
+initial_cox_model <- coxph(surv_fit_formula, data = final_patients)
+stepwise_cox_model <- stepAIC(initial_cox_model, direction = "backward")
+```
+
+```{r}
+summary(stepwise_cox_model)
+```
+
+
+The "Coef" represents the levels of risk. With a negative coefficient, we know the variable has a decreased risk on the event, and a positive coefficient indicates an increased risk on EVENT. Subsequently, when looking at exp(coef), we conclude that a ratio bigger than 1 means an increased risk and a ration smaller than 1 means a decreased risk.
+For instance, we see that diabetes has a positive coefficient 0.304, with ratio 1.355. People with diabetes thus have a 35.5% higher risk of EVENT, which is also significant with p=0.00501
+
+Below, we see that for instance for log_CREAT, the hazard ratio is 2.722 with a 95% confidence interval of (2.224, 3.331).
+
+The level of concordance with 0.684 says how well the model predicts. An accuracy of 68.4% is quite well. We also see that the model is overall highly significant with the very low p-values.
+
+
+# Extracting coefficients from the final model
+
+```{r}
+final_coefficients <- coef(stepwise_cox_model)
+print(final_coefficients)
+```
+
+The coefficients above are log-hazard ratios, and we can calculate the hazard ratio by exponentiating each coefficient:
+Hazard Ratio (HR) = $e^{\text{coefficient}}$
+
+This means per variable, that risk is increased or decreased if the predictor variable increased. Below, the changes and Hazard ratios per variable are shortly outlined.
+
+- SEX (-0.379): $e^{-0.379}$ = 0,684. This means that a 1-unit change (male to female) lowers the risk of occurring event with around 32%.
+
+- DIABETES (0.304): $e^{0.304}$ = 1.355. This means that having diabetes increases the hazard. Having diabetes is associated with 35.5% higher risk of the event occurring.
+
+- SYSTH (0.017): $e^{0.017}$ = 1.017. This indicates a 1.7% risk increase for each unit increase of the systolic blood pressure.
+
+- WEIGHT (-0.009): $e^{-0.009}$ = 0.991.  For interpretation of this, each unit of increase in weight means a 0.9% lower risk of event occurring.
+
+- LDL (0.103): $e^{0.103}$ = 1.109. This tells us that there’s a 10.9% higher risk of event occurring for each unit increase n LDL cholesterol.
+
+- log_CREAT (1.002) = $e^{1.002}$ = 2.724. This indicates a 172.4% higher risk of event occurring for each 1-unit increase of the log-transformed creatinine.
+
+
+Concluding. Some factors like diabetes, LDL and creatinine significantly increase the risk of occurring when unit of measuring change, while others might reduce the risk. Understanding how these variables interact with the outcome helps guide medical or practical decisions related to the modeled event.
+
+
+# Calculate concordance index for the final model
+
+```{r}
+final_surv <- Surv(time = final_patients$TEVENT, event = final_patients$EVENT)
+final_surv_fit_formula <- final_surv ~ predict(stepwise_cox_model, newdata = final_patients)
+final_cox_model <- coxph(final_surv_fit_formula, data = final_patients)
+concordance_index <- final_cox_model$concordance
+print(paste("Concordance Index:", concordance_index))
+```
+
+We see from the output 7 different concordance levels. We see that the 1st to the 5th are not possible and the 7th isn't possible either. We conclude to have a concordance level of 0.648
+
+# Summary of the final model and exponentiated coefficients
+```{r}
+summary(final_cox_model)
+exp(final_coefficients)
+```
+
+The main takeaways of this summary are that the concordance indext of 0.648 suggests moderate predictive ability. This means that the model can differentiate between high- and low-risk individuals about 68.4% of the time.
+On top of that, the complete model is statistically significant (z-score of 13.91 and p-value $ < 2e^{-16}$). 
+Lastly, as already explained in previous steps, the hazard ratios are again mentioned indicating increases and decreases in event occurring risks for 1-unit variable changes.
+
+# Cross-validation of the Cox model
+
+```{r}
+#| output: false
+set.seed(123)
+folds <- createFolds(final_patients$EVENT, k = 10, list = TRUE, returnTrain = TRUE)
+cv_concordance_indices <- numeric(10)
+
+for (i in 1:10) {
+    # Split the data into training and testing sets
+    train_data <- final_patients[folds[[i]], ]
+    test_data <- final_patients[-folds[[i]], ]
+
+    # Create the survival object for training data
+    surv_train <- Surv(time = train_data$TEVENT, event = train_data$EVENT)
+    surv_fit_formula <- surv_train ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
+
+    # Fit the Cox model on the training data
+    cox_model <- coxph(surv_fit_formula, data = train_data)
+
+    # Predict on the test data
+    test_surv <- Surv(time = test_data$TEVENT, event = test_data$EVENT)
+    predictions <- predict(cox_model, newdata = test_data)
+
+    cv_concordance_indices[i] <- coxph(test_surv ~ predictions, data = test_data)$concordance
+}
+
+mean_concordance_cv <- mean(cv_concordance_indices)
+mean_concordance_cv
+```
+
+```{r}
+#| output: false
+bootstrap_cox_model <- function(data, indices) {
+    resampled_data <- data[indices, ]
+    surv_object <- Surv(time = resampled_data$TEVENT, event = resampled_data$EVENT)
+    surv_fit_formula <- surv_object ~ SEX + DIABETES + SYSTH + DIASTH + WEIGHT + BMI + LDL + TRIG + log_CREAT
+
+    initial_cox_model <- coxph(surv_fit_formula, data = resampled_data)
+    stepwise_model <- stepAIC(initial_cox_model, direction = "backward", trace = FALSE)
+    all_vars <- colnames(data)[-c(1, 2)]
+    selected_vars <- names(coef(stepwise_model))
+
+    # Create a binary vector: 1 if the variable is included, 0 otherwise
+    inclusion_vector <- as.integer(all_vars %in% selected_vars)
+
+    return(inclusion_vector)
+}
+
+# Set the number of bootstrap samples
+set.seed(123)
+n_bootstrap_samples <- 100
+
+# Run bootstrapping
+bootstrap_results <- boot(data = final_patients, statistic = bootstrap_cox_model, R = n_bootstrap_samples)
+```
+
+
+# Analyze results: Create a table of inclusion frequencies
+
+```{r}
+inclusion_frequencies <- colMeans(bootstrap_results$t) # Get inclusion proportions
+inclusion_variables <- colnames(final_patients)[-c(1, 2)]
+inclusion_frequencies <- data.frame(Variable = inclusion_variables, Proportion = inclusion_frequencies)
+inclusion_frequencies
+```
+
+
+# Optional: Visualize the inclusion frequencies
+
+```{r}
+ggplot(inclusion_frequencies, aes(x = reorder(Variable, -Proportion), y = Proportion)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(
+        title = "Variable Inclusion Frequencies in Bootstrapped Cox Models",
+        x = "Predictor Variables",
+        y = "Proportion of Inclusion"
+    ) +
+    theme_minimal()
+```
+
+This code and visualisations above involves bootstrapping the Cox proportional hazards model multiple times, and tracks how frequently each variable is selected (i.e., included) in the model across different bootstrap iterations. The variable inclusion frequency plot shows how often each predictor was selected across multiple bootstrapped Cox models. It can be seen that variables like SYSTH, log_CREAT, and SEX were included more frequently, indicating they have a stronger or more consistent effect on the outcome.
